@@ -47,15 +47,27 @@ export interface Logger {
  */
 export function createLogger(workspacePath: string): Logger {
   const eventsPath = join(workspacePath, EVENTS_FILE);
+  let dirEnsured = false;
 
   function write(level: LogLevel, message: string, data?: Record<string, unknown>): void {
+    const event: LogEvent =
+      data === undefined
+        ? { ts: new Date().toISOString(), level, message }
+        : { ts: new Date().toISOString(), level, message, data };
+
+    let line: string;
     try {
-      const event: LogEvent =
-        data === undefined
-          ? { ts: new Date().toISOString(), level, message }
-          : { ts: new Date().toISOString(), level, message, data };
-      const line = `${JSON.stringify(event)}\n`;
-      mkdirSync(workspacePath, { recursive: true });
+      line = `${JSON.stringify(event)}\n`;
+    } catch {
+      // data was unserializable (e.g. circular); keep ts/level/message rather than dropping the event
+      line = `${JSON.stringify({ ts: event.ts, level, message })}\n`;
+    }
+
+    try {
+      if (!dirEnsured) {
+        mkdirSync(workspacePath, { recursive: true });
+        dirEnsured = true;
+      }
       appendFileSync(eventsPath, line, 'utf8');
     } catch {
       // logging is best-effort; never crash a stage

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -93,12 +93,26 @@ describe('createLogger', () => {
     expect(existsSync(logger.eventsPath)).toBe(true);
   });
 
-  it('never throws on an unserializable payload', () => {
+  it('never throws on an unserializable payload, and still writes the event without it', () => {
     const logger = createLogger(dir);
     const cyclic: Record<string, unknown> = {};
     cyclic.self = cyclic;
 
     expect(() => logger.info('cycle', cyclic)).not.toThrow();
+
+    const parsed = JSON.parse(readLines(logger.eventsPath)[0]);
+    expect(parsed.level).toBe('info');
+    expect(parsed.message).toBe('cycle');
+    expect('data' in parsed).toBe(false);
+  });
+
+  it('never throws when the workspace directory cannot be created', () => {
+    const filePath = join(dir, 'not-a-dir');
+    writeFileSync(filePath, 'x');
+    const logger = createLogger(filePath);
+
+    expect(() => logger.info('x')).not.toThrow();
+    expect(existsSync(logger.eventsPath)).toBe(false);
   });
 
   it('points eventsPath inside the workspace', () => {
