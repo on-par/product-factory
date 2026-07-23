@@ -53,4 +53,13 @@ export type {
   RecordAnswersResult,
 } from './interview/answers.js';
 
+export { buildIntentDoc, loadIntentDoc, saveIntentDoc, INTENT_DIR } from './intent/build.js';
+export type {
+  IntentDoc,
+  IntentStatement,
+  IntentStatementSource,
+  BuildIntentResult,
+  LoadIntentResult,
+} from './intent/build.js';
+
 export const VERSION = '0.1.0';
