@@ -16,6 +16,8 @@ import {
   loadConfig,
   createLogger,
   intakeTranscript,
+  generateClarifyingQuestions,
+  createAnthropicQuestionCaller,
   WORKSPACE_DIR,
   type Story,
 } from './index.js';
@@ -32,6 +34,7 @@ function printUsage(): void {
       '  init               Initialize a .pf/ workspace in the current directory',
       '  config             Print the resolved product-factory.json config as JSON',
       '  intake <file>      Ingest a brain-dump (use "-" to read stdin) into a transcript artifact',
+      '  interview questions <transcriptId>   Generate gap-tagged clarifying questions for a transcript',
       '  version            Print the version',
       '  readiness-demo     Score a sample story against the readiness rubric v0',
       '  help               Show this help',
@@ -40,7 +43,7 @@ function printUsage(): void {
   );
 }
 
-function main(argv: readonly string[]): number {
+async function main(argv: readonly string[]): Promise<number> {
   const command = argv[2] ?? 'help';
 
   switch (command) {
@@ -101,6 +104,47 @@ function main(argv: readonly string[]): number {
       return 0;
     }
 
+    case 'interview': {
+      if (argv[3] !== 'questions' || argv[4] === undefined) {
+        process.stderr.write('usage: product-factory interview questions <transcriptId>\n');
+        return 1;
+      }
+      const configResult = loadConfig(process.cwd());
+      if (!configResult.ok) {
+        process.stderr.write('invalid product-factory.json:\n');
+        for (const issue of configResult.issues) {
+          process.stderr.write(`  ${issue.path}: ${issue.message}\n`);
+        }
+        return 1;
+      }
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (apiKey === undefined || apiKey === '') {
+        process.stderr.write('ANTHROPIC_API_KEY is not set\n');
+        return 1;
+      }
+      const callModel = createAnthropicQuestionCaller({
+        apiKey,
+        model: configResult.config.model.name,
+      });
+      const result = await generateClarifyingQuestions(process.cwd(), argv[4], callModel);
+      if (!result.ok) {
+        process.stderr.write(`${result.error}\n`);
+        return 1;
+      }
+      const logger = createLogger(join(process.cwd(), WORKSPACE_DIR));
+      logger.info('clarifying questions generated', {
+        transcriptId: result.artifact.transcriptId,
+        questionsId: result.artifact.id,
+        count: result.artifact.questions.length,
+        artifactPath: result.artifactPath,
+      });
+      for (const question of result.artifact.questions) {
+        process.stdout.write(`[${question.gapType}] ${question.question}\n`);
+      }
+      process.stdout.write(`${result.artifact.id}\n`);
+      return 0;
+    }
+
     case 'version':
     case '--version':
     case '-v':
@@ -136,4 +180,4 @@ function main(argv: readonly string[]): number {
   }
 }
 
-process.exit(main(process.argv));
+process.exit(await main(process.argv));
