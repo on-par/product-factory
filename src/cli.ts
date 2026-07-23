@@ -20,6 +20,7 @@ import {
   createAnthropicQuestionCaller,
   recordAnswerRound,
   openBlockingQuestions,
+  buildIntentDoc,
   WORKSPACE_DIR,
   type Story,
   type ConfigIssue,
@@ -46,6 +47,7 @@ function printUsage(): void {
       '  intake <file>      Ingest a brain-dump (use "-" to read stdin) into a transcript artifact',
       '  interview questions <transcriptId>   Generate gap-tagged clarifying questions for a transcript',
       '  interview answer <questionsId> <file>      Record a round of answers (use "-" for stdin) and apply the stopping rule',
+      '  intent build <interviewId>   Build the intent doc from a pinned interview',
       '  version            Print the version',
       '  readiness-demo     Score a sample story against the readiness rubric v0',
       '  help               Show this help',
@@ -222,6 +224,33 @@ async function main(argv: readonly string[]): Promise<number> {
 
       process.stderr.write(usage);
       return 1;
+    }
+
+    case 'intent': {
+      const usage = 'usage: product-factory intent build <interviewId>\n';
+
+      if (argv[3] !== 'build' || argv[4] === undefined) {
+        process.stderr.write(usage);
+        return 1;
+      }
+
+      const result = buildIntentDoc(process.cwd(), argv[4]);
+      if (!result.ok) {
+        process.stderr.write(`${result.error}\n`);
+        return 1;
+      }
+      const logger = createLogger(join(process.cwd(), WORKSPACE_DIR));
+      logger.info('intent doc built', {
+        interviewId: argv[4],
+        intentId: result.doc.id,
+        statements: result.doc.statements.length,
+        docPath: result.docPath,
+      });
+      for (const statement of result.doc.statements) {
+        process.stdout.write(`[${statement.id}] ${statement.text}\n`);
+      }
+      process.stdout.write(`${result.doc.id}\n`);
+      return 0;
     }
 
     case 'version':
