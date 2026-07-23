@@ -5,7 +5,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { WORKSPACE_DIR } from '../workspace/init.js';
@@ -56,6 +56,10 @@ export type GenerateCriteriaResult =
   | { readonly ok: true; readonly criteria: CriteriaSet; readonly artifactPath: string }
   | { readonly ok: false; readonly error: string };
 
+export type LoadCriteriaResult =
+  | { readonly ok: true; readonly criteria: CriteriaSet; readonly artifactPath: string }
+  | { readonly ok: false; readonly error: string };
+
 const scenarioSchema = z.object({
   name: z.string().min(1),
   given: z.array(z.string().min(1)).min(1),
@@ -69,6 +73,24 @@ const criteriaResponseSchema = z.object({
       z.object({
         storyIndex: z.number().int().min(0),
         scenarios: z.array(scenarioSchema).min(1),
+      }),
+    )
+    .min(1),
+});
+
+const persistedCriteriaSchema = z.object({
+  id: z.string().regex(/^[0-9a-f]{12}$/),
+  decompositionId: z.string().min(1),
+  intentId: z.string().min(1),
+  createdAt: z.string().min(1),
+  stories: z
+    .array(
+      z.object({
+        storyIndex: z.number().int().min(0),
+        storyTitle: z.string().min(1),
+        tracesTo: z.array(z.string().min(1)).min(1),
+        scenarios: z.array(scenarioSchema).min(1),
+        readinessFlags: z.array(z.string()),
       }),
     )
     .min(1),
@@ -258,4 +280,38 @@ export async function generateAcceptanceCriteria(
   writeFileSync(artifactPath, `${JSON.stringify(criteria, null, 2)}\n`, 'utf8');
 
   return { ok: true, criteria, artifactPath };
+}
+
+/** Load a previously persisted acceptance-criteria set from `<targetDir>/.pf/criteria/<criteriaId>.json`. */
+export function loadCriteria(targetDir: string, criteriaId: string): LoadCriteriaResult {
+  if (!/^[0-9a-f]{12}$/.test(criteriaId)) {
+    return { ok: false, error: `criteria set ${criteriaId} not found` };
+  }
+
+  const artifactPath = join(targetDir, WORKSPACE_DIR, CRITERIA_DIR, `${criteriaId}.json`);
+  let raw: string;
+  try {
+    raw = readFileSync(artifactPath, 'utf8');
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') {
+      return { ok: false, error: `criteria set ${criteriaId} not found` };
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: `unable to read criteria set ${criteriaId}: ${message}` };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ok: false, error: `criteria set ${criteriaId} is not a valid criteria set` };
+  }
+
+  const result = persistedCriteriaSchema.safeParse(parsed);
+  if (!result.success) {
+    return { ok: false, error: `criteria set ${criteriaId} is not a valid criteria set` };
+  }
+
+  return { ok: true, criteria: result.data as CriteriaSet, artifactPath };
 }

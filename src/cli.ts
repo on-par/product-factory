@@ -28,6 +28,7 @@ import {
   storySentence,
   generateAcceptanceCriteria,
   renderScenario,
+  judgeStories,
   WORKSPACE_DIR,
   type Story,
   type ConfigIssue,
@@ -58,6 +59,7 @@ function printUsage(): void {
       '  intent approve <intentId>    Approve the intent doc (human gate #1)',
       '  decompose <intentId>         Decompose an approved intent doc into an epic and traceable stories',
       '  criteria <decompositionId>   Generate Gherkin acceptance criteria for every story in a decomposition',
+      '  judge <criteriaId>           Judge every story: readiness rubric + intent-alignment scores with reasons',
       '  version            Print the version',
       '  readiness-demo     Score a sample story against the readiness rubric v0',
       '  help               Show this help',
@@ -395,6 +397,56 @@ async function main(argv: readonly string[]): Promise<number> {
         }
       }
       process.stdout.write(`${result.criteria.id}\n`);
+      return 0;
+    }
+
+    case 'judge': {
+      const criteriaId = argv[3];
+      if (criteriaId === undefined) {
+        process.stderr.write('usage: product-factory judge <criteriaId>\n');
+        return 1;
+      }
+
+      const configResult = loadConfig(process.cwd());
+      if (!configResult.ok) {
+        printConfigIssues(configResult.issues);
+        return 1;
+      }
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (apiKey === undefined || apiKey === '') {
+        process.stderr.write('ANTHROPIC_API_KEY is not set\n');
+        return 1;
+      }
+      const callModel = createAnthropicQuestionCaller({
+        apiKey,
+        model: configResult.config.model.name,
+        // Multi-story verdict JSON outgrows the 2048 default.
+        maxTokens: 4096,
+      });
+      const result = await judgeStories(process.cwd(), criteriaId, callModel);
+      if (!result.ok) {
+        process.stderr.write(`${result.error}\n`);
+        return 1;
+      }
+      const logger = createLogger(join(process.cwd(), WORKSPACE_DIR));
+      logger.info('stories judged', {
+        criteriaId,
+        verdictId: result.verdicts.id,
+        stories: result.verdicts.stories.length,
+        artifactPath: result.artifactPath,
+      });
+      for (const verdict of result.verdicts.stories) {
+        process.stdout.write(
+          `[${verdict.storyIndex}] ${verdict.storyTitle} (traces-to: ${verdict.tracesTo.join(', ')}) readiness: ${verdict.readinessScore.toFixed(2)} intent-alignment: ${verdict.intentAlignmentScore.toFixed(2)}\n`,
+        );
+        for (const reason of verdict.readinessReasons) {
+          process.stdout.write(`  readiness: ${reason}\n`);
+        }
+        for (const reason of verdict.intentAlignmentReasons) {
+          process.stdout.write(`  intent: ${reason}\n`);
+        }
+      }
+      process.stdout.write(`${result.verdicts.id}\n`);
       return 0;
     }
 
