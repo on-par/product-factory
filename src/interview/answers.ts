@@ -237,7 +237,7 @@ export function recordAnswerRound(
     if (index >= session.questions.length) {
       return { ok: false, error: `no question at index ${key}` };
     }
-    if (value.trim().length === 0) {
+    if (typeof value !== 'string' || value.trim().length === 0) {
       return { ok: false, error: `answer for question ${key} is empty` };
     }
     validatedAnswers.push({ index, value });

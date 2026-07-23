@@ -221,6 +221,18 @@ describe('recordAnswerRound', () => {
     expect(result.error).toContain('0');
   });
 
+  it('rejects a non-string answer value instead of throwing', async () => {
+    const questionsId = await seedQuestions(dir, MIXED);
+    const result = recordAnswerRound(dir, questionsId, { '0': 123 } as unknown as Record<
+      string,
+      string
+    >);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected not ok');
+    expect(result.error).toContain('0');
+  });
+
   it('rejects a non-positive-integer maxRounds', async () => {
     const questionsId = await seedQuestions(dir, MIXED);
     const zero = recordAnswerRound(dir, questionsId, {}, { maxRounds: 0 });

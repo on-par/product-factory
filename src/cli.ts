@@ -22,7 +22,15 @@ import {
   openBlockingQuestions,
   WORKSPACE_DIR,
   type Story,
+  type ConfigIssue,
 } from './index.js';
+
+function printConfigIssues(issues: readonly ConfigIssue[]): void {
+  process.stderr.write('invalid product-factory.json:\n');
+  for (const issue of issues) {
+    process.stderr.write(`  ${issue.path}: ${issue.message}\n`);
+  }
+}
 
 function printUsage(): void {
   process.stdout.write(
@@ -70,10 +78,7 @@ async function main(argv: readonly string[]): Promise<number> {
         process.stdout.write(`${JSON.stringify(result.config, null, 2)}\n`);
         return 0;
       }
-      process.stderr.write('invalid product-factory.json:\n');
-      for (const issue of result.issues) {
-        process.stderr.write(`  ${issue.path}: ${issue.message}\n`);
-      }
+      printConfigIssues(result.issues);
       return 1;
     }
 
@@ -118,10 +123,7 @@ async function main(argv: readonly string[]): Promise<number> {
         }
         const configResult = loadConfig(process.cwd());
         if (!configResult.ok) {
-          process.stderr.write('invalid product-factory.json:\n');
-          for (const issue of configResult.issues) {
-            process.stderr.write(`  ${issue.path}: ${issue.message}\n`);
-          }
+          printConfigIssues(configResult.issues);
           return 1;
         }
         const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -145,9 +147,9 @@ async function main(argv: readonly string[]): Promise<number> {
           count: result.artifact.questions.length,
           artifactPath: result.artifactPath,
         });
-        for (const question of result.artifact.questions) {
-          process.stdout.write(`[${question.gapType}] ${question.question}\n`);
-        }
+        result.artifact.questions.forEach((question, index) => {
+          process.stdout.write(`[${index}] [${question.gapType}] ${question.question}\n`);
+        });
         process.stdout.write(`${result.artifact.id}\n`);
         return 0;
       }
@@ -187,10 +189,7 @@ async function main(argv: readonly string[]): Promise<number> {
 
         const configResult = loadConfig(process.cwd());
         if (!configResult.ok) {
-          process.stderr.write('invalid product-factory.json:\n');
-          for (const issue of configResult.issues) {
-            process.stderr.write(`  ${issue.path}: ${issue.message}\n`);
-          }
+          printConfigIssues(configResult.issues);
           return 1;
         }
 
