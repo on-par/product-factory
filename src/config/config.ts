@@ -64,7 +64,17 @@ export function loadConfig(targetDir: string): LoadConfigResult {
     return { ok: true, config: configSchema.parse({}), configPath: undefined };
   }
 
-  const raw = readFileSync(configPath, 'utf8');
+  let raw: string;
+  try {
+    raw = readFileSync(configPath, 'utf8');
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      ok: false,
+      issues: [{ path: '(root)', message: `unable to read config file: ${message}` }],
+    };
+  }
+
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);

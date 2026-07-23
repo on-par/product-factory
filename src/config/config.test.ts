@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -105,5 +105,17 @@ describe('loadConfig', () => {
     expect(result.issues).toHaveLength(1);
     expect(result.issues[0]?.path).toBe('(root)');
     expect(result.issues[0]?.message).toContain('invalid JSON');
+  });
+
+  it('reports a read failure instead of throwing when the config path is unreadable', () => {
+    mkdirSync(join(dir, CONFIG_FILE));
+
+    const result = loadConfig(dir);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.issues).toHaveLength(1);
+    expect(result.issues[0]?.path).toBe('(root)');
+    expect(result.issues[0]?.message).toContain('unable to read config file');
   });
 });
