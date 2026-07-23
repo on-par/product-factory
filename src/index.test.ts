@@ -7,6 +7,8 @@ import {
   STATE_FILE,
   loadConfig,
   CONFIG_FILE,
+  createLogger,
+  EVENTS_FILE,
 } from './index.js';
 
 describe('public API', () => {
@@ -28,5 +30,10 @@ describe('public API', () => {
   it('re-exports loadConfig and CONFIG_FILE', () => {
     expect(typeof loadConfig).toBe('function');
     expect(CONFIG_FILE).toBe('product-factory.json');
+  });
+
+  it('re-exports createLogger and EVENTS_FILE', () => {
+    expect(typeof createLogger).toBe('function');
+    expect(EVENTS_FILE).toBe('events.ndjson');
   });
 });

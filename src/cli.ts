@@ -7,7 +7,14 @@
  * to end and the verify gate has something to build a binary from.
  */
 
-import { VERSION, initWorkspace, scoreReadiness, loadConfig, type Story } from './index.js';
+import {
+  VERSION,
+  initWorkspace,
+  scoreReadiness,
+  loadConfig,
+  createLogger,
+  type Story,
+} from './index.js';
 
 function printUsage(): void {
   process.stdout.write(
@@ -34,6 +41,10 @@ function main(argv: readonly string[]): number {
   switch (command) {
     case 'init': {
       const result = initWorkspace(process.cwd());
+      const logger = createLogger(result.workspacePath);
+      logger.info(result.created ? 'workspace initialized' : 'workspace already initialized', {
+        workspacePath: result.workspacePath,
+      });
       if (result.created) {
         process.stdout.write(`initialized Product Factory workspace at ${result.workspacePath}\n`);
       } else {
