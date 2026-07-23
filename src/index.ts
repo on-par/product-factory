@@ -13,4 +13,7 @@ export type { Story, ReadinessCheck, ReadinessResult } from './readiness/score.j
 export { initWorkspace, WORKSPACE_DIR, STATE_FILE } from './workspace/init.js';
 export type { InitWorkspaceResult } from './workspace/init.js';
 
+export { loadConfig, CONFIG_FILE } from './config/config.js';
+export type { ProductFactoryConfig, LoadConfigResult, ConfigIssue } from './config/config.js';
+
 export const VERSION = '0.1.0';
