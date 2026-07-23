@@ -19,4 +19,7 @@ export type { ProductFactoryConfig, LoadConfigResult, ConfigIssue } from './conf
 export { createLogger, EVENTS_FILE } from './log/logger.js';
 export type { Logger, LogLevel, LogEvent } from './log/logger.js';
 
+export { intakeTranscript, TRANSCRIPTS_DIR } from './intake/intake.js';
+export type { TranscriptArtifact, IntakeResult } from './intake/intake.js';
+
 export const VERSION = '0.1.0';
