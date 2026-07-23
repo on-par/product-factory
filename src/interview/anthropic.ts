@@ -9,6 +9,8 @@ export interface AnthropicCallerOptions {
   readonly apiKey: string;
   /** Model name, e.g. from product-factory.json's model.name. */
   readonly model: string;
+  /** Max tokens for the completion; defaults to 2048 (sized for short clarifying-question output). */
+  readonly maxTokens?: number;
   /** Injectable for tests; defaults to global fetch. */
   readonly fetchFn?: typeof fetch;
 }
@@ -27,6 +29,7 @@ export function createAnthropicQuestionCaller(
   options: AnthropicCallerOptions,
 ): QuestionModelCaller {
   const fetchFn = options.fetchFn ?? fetch;
+  const maxTokens = options.maxTokens ?? 2048;
 
   return async (prompt: string): Promise<string> => {
     const response = await fetchFn('https://api.anthropic.com/v1/messages', {
@@ -38,7 +41,7 @@ export function createAnthropicQuestionCaller(
       },
       body: JSON.stringify({
         model: options.model,
-        max_tokens: 2048,
+        max_tokens: maxTokens,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
