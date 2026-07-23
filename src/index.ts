@@ -72,6 +72,7 @@ export type { IntentApproval, ApproveIntentResult, LoadApprovalResult } from './
 
 export {
   decomposeIntent,
+  loadDecomposition,
   buildDecomposePrompt,
   validateTraceability,
   storySentence,
@@ -83,6 +84,22 @@ export type {
   Decomposition,
   DecomposeModelCaller,
   DecomposeResult,
+  LoadDecompositionResult,
 } from './decompose/decompose.js';
+
+export {
+  generateAcceptanceCriteria,
+  buildCriteriaPrompt,
+  validateScenarioCoverage,
+  renderScenario,
+  CRITERIA_DIR,
+} from './criteria/criteria.js';
+export type {
+  GherkinScenario,
+  StoryCriteria,
+  CriteriaSet,
+  CriteriaModelCaller,
+  GenerateCriteriaResult,
+} from './criteria/criteria.js';
 
 export const VERSION = '0.1.0';

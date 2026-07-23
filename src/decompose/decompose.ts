@@ -5,7 +5,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { WORKSPACE_DIR } from '../workspace/init.js';
@@ -63,6 +63,18 @@ const decompositionResponseSchema = z.object({
   epic: z.object({ title: z.string().min(1), summary: z.string().min(1) }),
   stories: z.array(storySchema).min(1),
 });
+
+const persistedDecompositionSchema = z.object({
+  id: z.string().regex(/^[0-9a-f]{12}$/),
+  intentId: z.string().min(1),
+  createdAt: z.string().min(1),
+  epic: z.object({ title: z.string().min(1), summary: z.string().min(1) }),
+  stories: z.array(storySchema).min(1),
+});
+
+export type LoadDecompositionResult =
+  | { readonly ok: true; readonly decomposition: Decomposition; readonly artifactPath: string }
+  | { readonly ok: false; readonly error: string };
 
 /** Build the decomposer prompt instructing the model to return an epic + traceable stories as JSON. */
 export function buildDecomposePrompt(doc: IntentDoc): string {
@@ -214,4 +226,46 @@ export async function decomposeIntent(
   writeFileSync(artifactPath, `${JSON.stringify(decomposition, null, 2)}\n`, 'utf8');
 
   return { ok: true, decomposition, artifactPath };
+}
+
+/** Load a previously persisted decomposition from `<targetDir>/.pf/decompositions/<decompositionId>.json`. */
+export function loadDecomposition(
+  targetDir: string,
+  decompositionId: string,
+): LoadDecompositionResult {
+  if (!/^[0-9a-f]{12}$/.test(decompositionId)) {
+    return { ok: false, error: `decomposition ${decompositionId} not found` };
+  }
+
+  const artifactPath = join(
+    targetDir,
+    WORKSPACE_DIR,
+    DECOMPOSITIONS_DIR,
+    `${decompositionId}.json`,
+  );
+  let raw: string;
+  try {
+    raw = readFileSync(artifactPath, 'utf8');
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') {
+      return { ok: false, error: `decomposition ${decompositionId} not found` };
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: `unable to read decomposition ${decompositionId}: ${message}` };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ok: false, error: `decomposition ${decompositionId} is not a valid decomposition` };
+  }
+
+  const result = persistedDecompositionSchema.safeParse(parsed);
+  if (!result.success) {
+    return { ok: false, error: `decomposition ${decompositionId} is not a valid decomposition` };
+  }
+
+  return { ok: true, decomposition: result.data as Decomposition, artifactPath };
 }

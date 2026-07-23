@@ -1,9 +1,10 @@
-import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   decomposeIntent,
+  loadDecomposition,
   buildDecomposePrompt,
   validateTraceability,
   storySentence,
@@ -217,6 +218,50 @@ describe('decomposeIntent', () => {
     const result = await decomposeIntent(dir, DOC.id, fenced);
 
     expect(result.ok).toBe(true);
+  });
+});
+
+describe('loadDecomposition', () => {
+  it('round-trips an artifact created by decomposeIntent', async () => {
+    seedApprovedDoc(dir);
+    const created = await decomposeIntent(dir, DOC.id, fakeCaller(GOOD_PAYLOAD));
+    if (!created.ok) throw new Error('expected ok');
+
+    const result = loadDecomposition(dir, created.decomposition.id);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.decomposition).toEqual(created.decomposition);
+    expect(result.artifactPath).toBe(created.artifactPath);
+  });
+
+  it('unknown decompositionId returns not found', () => {
+    const result = loadDecomposition(dir, 'ffffffffffff');
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected not ok');
+    expect(result.error).toBe('decomposition ffffffffffff not found');
+  });
+
+  it('malformed decompositionId returns the same not-found shape', () => {
+    const result = loadDecomposition(dir, 'nope');
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected not ok');
+    expect(result.error).toBe('decomposition nope not found');
+  });
+
+  it('corrupt artifact file returns an invalid-decomposition error', () => {
+    const decompositionsDir = join(dir, WORKSPACE_DIR, DECOMPOSITIONS_DIR);
+    const id = 'abcdefabcdef';
+    mkdirSync(decompositionsDir, { recursive: true });
+    writeFileSync(join(decompositionsDir, `${id}.json`), 'not json', 'utf8');
+
+    const result = loadDecomposition(dir, id);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected not ok');
+    expect(result.error).toBe(`decomposition ${id} is not a valid decomposition`);
   });
 });
 
