@@ -121,16 +121,23 @@ export function buildCriteriaPrompt(decomposition: Decomposition): string {
   return lines.join('\n');
 }
 
-/** Pure check for scenario coverage: every story index in range, no duplicates, no gaps. */
+/**
+ * Pure check for entry coverage: every story index in range, no duplicates, no gaps.
+ * `entryLabel`/`missingLabel` let callers outside this stage (e.g. the judge stage,
+ * which reuses this same shape check for verdict entries) phrase the problem
+ * strings for what they're actually validating.
+ */
 export function validateScenarioCoverage(
   entries: readonly { storyIndex: number }[],
   storyCount: number,
+  entryLabel = 'scenario group',
+  missingLabel = 'scenarios',
 ): string[] {
   const problems: string[] = [];
   const seen = new Set<number>();
   for (const entry of entries) {
     if (entry.storyIndex >= storyCount) {
-      problems.push(`scenario group references unknown story index ${entry.storyIndex}`);
+      problems.push(`${entryLabel} references unknown story index ${entry.storyIndex}`);
       continue;
     }
     if (seen.has(entry.storyIndex)) {
@@ -141,7 +148,7 @@ export function validateScenarioCoverage(
   }
   for (let index = 0; index < storyCount; index += 1) {
     if (!seen.has(index)) {
-      problems.push(`story index ${index} has no scenarios`);
+      problems.push(`story index ${index} has no ${missingLabel}`);
     }
   }
   return problems;

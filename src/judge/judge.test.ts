@@ -222,7 +222,24 @@ describe('judgeStories', () => {
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('expected not ok');
     expect(result.error).toContain('coverage problems');
-    expect(result.error).toContain('story index 1 has no scenarios');
+    expect(result.error).toContain('story index 1 has no verdict');
+  });
+
+  it('rejects a payload referencing an unknown story index with judge-specific wording', async () => {
+    const { criteria } = await seedCriteria(dir);
+    const badPayload = {
+      stories: [
+        { storyIndex: 0, intentAlignmentScore: 1, reasons: [] },
+        { storyIndex: 7, intentAlignmentScore: 1, reasons: [] },
+      ],
+    };
+
+    const result = await judgeStories(dir, criteria.id, judgeFakeCaller(badPayload));
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected not ok');
+    expect(result.error).toContain('coverage problems');
+    expect(result.error).toContain('verdict entry references unknown story index 7');
   });
 
   it('rejects a payload with a duplicate story index', async () => {
@@ -317,6 +334,22 @@ describe('judgeStories', () => {
     const persisted = JSON.parse(readFileSync(artifactPath, 'utf8'));
     expect(persisted).toEqual(result.verdicts);
     expect(result.verdicts.id).toMatch(/^[0-9a-f]{12}$/);
+  });
+
+  it('rejects a judge payload whose index has no matching story in a corrupted criteria set', async () => {
+    const { criteria } = await seedCriteria(dir);
+    const criteriaDir = join(dir, WORKSPACE_DIR, 'criteria');
+    const corrupted = {
+      ...criteria,
+      stories: [criteria.stories[0], { ...criteria.stories[1], storyIndex: 0 }],
+    };
+    writeFileSync(join(criteriaDir, `${criteria.id}.json`), JSON.stringify(corrupted));
+
+    const result = await judgeStories(dir, criteria.id, judgeFakeCaller(goodJudgePayload()));
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected not ok');
+    expect(result.error).toBe(`criteria set ${criteria.id} has no story at index 1`);
   });
 });
 

@@ -14,7 +14,6 @@ import {
   renderScenario,
   validateScenarioCoverage,
   type CriteriaSet,
-  type StoryCriteria,
 } from '../criteria/criteria.js';
 import { loadDecomposition, storySentence, type DecomposedStory } from '../decompose/decompose.js';
 import { loadIntentDoc, type IntentDoc } from '../intent/build.js';
@@ -208,7 +207,12 @@ export async function judgeStories(
     return { ok: false, error: 'model returned an invalid judge payload' };
   }
 
-  const coverageProblems = validateScenarioCoverage(parsed.stories, criteria.stories.length);
+  const coverageProblems = validateScenarioCoverage(
+    parsed.stories,
+    criteria.stories.length,
+    'verdict entry',
+    'verdict',
+  );
   if (coverageProblems.length > 0) {
     return {
       ok: false,
@@ -221,30 +225,32 @@ export async function judgeStories(
     return { ok: false, error: `judge verdicts are missing reasons: ${reasonProblems.join('; ')}` };
   }
 
-  const stories: StoryVerdict[] = parsed.stories
-    .slice()
-    .sort((a, b) => a.storyIndex - b.storyIndex)
-    .map((entry) => {
-      const storyCriteria = criteria.stories.find(
-        (s) => s.storyIndex === entry.storyIndex,
-      ) as StoryCriteria;
-      const story = decomposition.stories[entry.storyIndex];
-      const readiness = scoreReadiness({
-        actor: story.asA,
-        acceptanceCriteria: storyCriteria.scenarios.map(renderScenario),
-        openQuestions: [],
-      });
-
+  const stories: StoryVerdict[] = [];
+  for (const entry of parsed.stories.slice().sort((a, b) => a.storyIndex - b.storyIndex)) {
+    const storyCriteria = criteria.stories.find((s) => s.storyIndex === entry.storyIndex);
+    if (storyCriteria === undefined) {
       return {
-        storyIndex: entry.storyIndex,
-        storyTitle: storyCriteria.storyTitle,
-        tracesTo: storyCriteria.tracesTo,
-        readinessScore: readiness.score,
-        readinessReasons: readiness.missing,
-        intentAlignmentScore: entry.intentAlignmentScore,
-        intentAlignmentReasons: entry.reasons,
+        ok: false,
+        error: `criteria set ${criteriaId} has no story at index ${entry.storyIndex}`,
       };
+    }
+    const story = decomposition.stories[entry.storyIndex];
+    const readiness = scoreReadiness({
+      actor: story.asA,
+      acceptanceCriteria: storyCriteria.scenarios.map(renderScenario),
+      openQuestions: [],
     });
+
+    stories.push({
+      storyIndex: entry.storyIndex,
+      storyTitle: storyCriteria.storyTitle,
+      tracesTo: storyCriteria.tracesTo,
+      readinessScore: readiness.score,
+      readinessReasons: readiness.missing,
+      intentAlignmentScore: entry.intentAlignmentScore,
+      intentAlignmentReasons: entry.reasons,
+    });
+  }
 
   const id = createHash('sha256')
     .update(`${criteriaId}\n${JSON.stringify({ stories })}`, 'utf8')
