@@ -89,6 +89,7 @@ export type {
 
 export {
   generateAcceptanceCriteria,
+  loadCriteria,
   buildCriteriaPrompt,
   validateScenarioCoverage,
   renderScenario,
@@ -101,6 +102,15 @@ export type {
   CriteriaSet,
   CriteriaModelCaller,
   GenerateCriteriaResult,
+  LoadCriteriaResult,
 } from './criteria/criteria.js';
+
+export {
+  judgeStories,
+  buildJudgePrompt,
+  validateAlignmentReasons,
+  VERDICTS_DIR,
+} from './judge/judge.js';
+export type { StoryVerdict, VerdictSet, JudgeModelCaller, JudgeResult } from './judge/judge.js';
 
 export const VERSION = '0.1.0';

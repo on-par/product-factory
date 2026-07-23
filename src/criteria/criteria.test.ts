@@ -1,9 +1,10 @@
-import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   generateAcceptanceCriteria,
+  loadCriteria,
   buildCriteriaPrompt,
   validateScenarioCoverage,
   renderScenario,
@@ -358,6 +359,65 @@ describe('generateAcceptanceCriteria', () => {
     for (const storyCriteria of result.criteria.stories) {
       expect(storyCriteria.readinessFlags).toEqual([]);
     }
+  });
+});
+
+describe('loadCriteria', () => {
+  it('round-trips a persisted criteria set', async () => {
+    const decomposition = await seedDecomposition(dir);
+    const generated = await generateAcceptanceCriteria(
+      dir,
+      decomposition.id,
+      fakeCaller(goodPayload()),
+    );
+    if (!generated.ok) throw new Error('expected ok');
+
+    const result = loadCriteria(dir, generated.criteria.id);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.criteria).toEqual(generated.criteria);
+    expect(result.artifactPath).toBe(generated.artifactPath);
+  });
+
+  it('malformed criteria id returns not found', () => {
+    const result = loadCriteria(dir, 'nope');
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected not ok');
+    expect(result.error).toBe('criteria set nope not found');
+  });
+
+  it('missing criteria file returns not found', () => {
+    const result = loadCriteria(dir, 'ffffffffffff');
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected not ok');
+    expect(result.error).toBe('criteria set ffffffffffff not found');
+  });
+
+  it('invalid JSON returns an invalid-shape error', () => {
+    const criteriaDir = join(dir, WORKSPACE_DIR, CRITERIA_DIR);
+    mkdirSync(criteriaDir, { recursive: true });
+    writeFileSync(join(criteriaDir, 'aaaaaaaaaaaa.json'), 'not json', 'utf8');
+
+    const result = loadCriteria(dir, 'aaaaaaaaaaaa');
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected not ok');
+    expect(result.error).toBe('criteria set aaaaaaaaaaaa is not a valid criteria set');
+  });
+
+  it('invalid shape returns an invalid-shape error', () => {
+    const criteriaDir = join(dir, WORKSPACE_DIR, CRITERIA_DIR);
+    mkdirSync(criteriaDir, { recursive: true });
+    writeFileSync(join(criteriaDir, 'aaaaaaaaaaaa.json'), JSON.stringify({ foo: 'bar' }), 'utf8');
+
+    const result = loadCriteria(dir, 'aaaaaaaaaaaa');
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected not ok');
+    expect(result.error).toBe('criteria set aaaaaaaaaaaa is not a valid criteria set');
   });
 });
 
