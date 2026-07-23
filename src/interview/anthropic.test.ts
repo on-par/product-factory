@@ -33,6 +33,29 @@ describe('createAnthropicQuestionCaller', () => {
     const body = JSON.parse(capturedInit?.body as string);
     expect(body.model).toBe('claude-sonnet-4-5');
     expect(body.messages[0].content).toBe('describe the transcript');
+    expect(body.max_tokens).toBe(2048);
+  });
+
+  it('honors an overridden maxTokens', async () => {
+    let capturedInit: RequestInit | undefined;
+    const fetchFn: typeof fetch = async (_url, init) => {
+      capturedInit = init;
+      return new Response(JSON.stringify({ content: [{ type: 'text', text: '{}' }] }), {
+        status: 200,
+      });
+    };
+
+    const caller = createAnthropicQuestionCaller({
+      apiKey: 'sk-test',
+      model: 'claude-sonnet-4-5',
+      maxTokens: 4096,
+      fetchFn,
+    });
+
+    await caller('prompt');
+
+    const body = JSON.parse(capturedInit?.body as string);
+    expect(body.max_tokens).toBe(4096);
   });
 
   it('rejects with the status code on a non-2xx response', async () => {

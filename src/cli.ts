@@ -313,6 +313,9 @@ async function main(argv: readonly string[]): Promise<number> {
       const callModel = createAnthropicQuestionCaller({
         apiKey,
         model: configResult.config.model.name,
+        // An epic plus multiple stories is a larger payload than the
+        // clarifying-questions default (2048) comfortably fits.
+        maxTokens: 4096,
       });
       const result = await decomposeIntent(process.cwd(), intentId, callModel);
       if (!result.ok) {
