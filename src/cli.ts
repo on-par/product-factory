@@ -26,6 +26,8 @@ import {
   loadIntentApproval,
   decomposeIntent,
   storySentence,
+  generateAcceptanceCriteria,
+  renderScenario,
   WORKSPACE_DIR,
   type Story,
   type ConfigIssue,
@@ -55,6 +57,7 @@ function printUsage(): void {
       '  intent build <interviewId>   Build the intent doc from a pinned interview',
       '  intent approve <intentId>    Approve the intent doc (human gate #1)',
       '  decompose <intentId>         Decompose an approved intent doc into an epic and traceable stories',
+      '  criteria <decompositionId>   Generate Gherkin acceptance criteria for every story in a decomposition',
       '  version            Print the version',
       '  readiness-demo     Score a sample story against the readiness rubric v0',
       '  help               Show this help',
@@ -336,6 +339,58 @@ async function main(argv: readonly string[]): Promise<number> {
         );
       });
       process.stdout.write(`${result.decomposition.id}\n`);
+      return 0;
+    }
+
+    case 'criteria': {
+      const decompositionId = argv[3];
+      if (decompositionId === undefined) {
+        process.stderr.write('usage: product-factory criteria <decompositionId>\n');
+        return 1;
+      }
+
+      const configResult = loadConfig(process.cwd());
+      if (!configResult.ok) {
+        printConfigIssues(configResult.issues);
+        return 1;
+      }
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (apiKey === undefined || apiKey === '') {
+        process.stderr.write('ANTHROPIC_API_KEY is not set\n');
+        return 1;
+      }
+      const callModel = createAnthropicQuestionCaller({
+        apiKey,
+        model: configResult.config.model.name,
+        // Multi-story Gherkin output outgrows the 2048 default.
+        maxTokens: 4096,
+      });
+      const result = await generateAcceptanceCriteria(process.cwd(), decompositionId, callModel);
+      if (!result.ok) {
+        process.stderr.write(`${result.error}\n`);
+        return 1;
+      }
+      const logger = createLogger(join(process.cwd(), WORKSPACE_DIR));
+      const scenarioCount = result.criteria.stories.reduce(
+        (total, story) => total + story.scenarios.length,
+        0,
+      );
+      logger.info('acceptance criteria generated', {
+        decompositionId,
+        criteriaId: result.criteria.id,
+        stories: result.criteria.stories.length,
+        scenarios: scenarioCount,
+        artifactPath: result.artifactPath,
+      });
+      for (const storyCriteria of result.criteria.stories) {
+        process.stdout.write(
+          `[${storyCriteria.storyIndex}] ${storyCriteria.storyTitle} (traces-to: ${storyCriteria.tracesTo.join(', ')})\n`,
+        );
+        for (const scenario of storyCriteria.scenarios) {
+          process.stdout.write(`${renderScenario(scenario)}\n`);
+        }
+      }
+      process.stdout.write(`${result.criteria.id}\n`);
       return 0;
     }
 
