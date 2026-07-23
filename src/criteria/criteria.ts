@@ -9,7 +9,13 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { WORKSPACE_DIR } from '../workspace/init.js';
-import { loadDecomposition, storySentence, type Decomposition } from '../decompose/decompose.js';
+import {
+  loadDecomposition,
+  storySentence,
+  type Decomposition,
+  type DecomposedStory,
+} from '../decompose/decompose.js';
+import { scoreReadiness } from '../readiness/score.js';
 
 /** Name of the directory inside the workspace that holds acceptance-criteria artifacts. */
 export const CRITERIA_DIR = 'criteria';
@@ -28,6 +34,8 @@ export interface StoryCriteria {
   readonly storyTitle: string;
   readonly tracesTo: readonly string[];
   readonly scenarios: readonly GherkinScenario[];
+  /** Readiness-rubric failures for this story; empty when the story passes the structural pre-check. */
+  readonly readinessFlags: readonly string[];
 }
 
 /** A persisted acceptance-criteria set — Gherkin scenarios for every story in a decomposition. */
@@ -115,6 +123,18 @@ export function validateScenarioCoverage(
     }
   }
   return problems;
+}
+
+/** Run the readiness rubric over one story's structural shape; returns the descriptions of failed checks. */
+export function checkStoryReadiness(
+  story: DecomposedStory,
+  scenarios: readonly GherkinScenario[],
+): readonly string[] {
+  return scoreReadiness({
+    actor: story.asA,
+    acceptanceCriteria: scenarios.map(renderScenario),
+    openQuestions: [],
+  }).missing;
 }
 
 /** Render a structured scenario to canonical Gherkin text for display/export. */
@@ -215,6 +235,7 @@ export async function generateAcceptanceCriteria(
         storyTitle: story.title,
         tracesTo: story.tracesTo,
         scenarios: entry.scenarios,
+        readinessFlags: checkStoryReadiness(story, entry.scenarios),
       };
     });
 

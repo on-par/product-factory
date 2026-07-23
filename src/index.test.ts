@@ -17,6 +17,7 @@ import {
   recordAnswerRound,
   evaluateStoppingRule,
   ANSWERS_DIR,
+  checkStoryReadiness,
 } from './index.js';
 
 describe('public API', () => {
@@ -60,5 +61,14 @@ describe('public API', () => {
     expect(typeof recordAnswerRound).toBe('function');
     expect(typeof evaluateStoppingRule).toBe('function');
     expect(ANSWERS_DIR).toBe('answers');
+  });
+
+  it('re-exports checkStoryReadiness', () => {
+    expect(typeof checkStoryReadiness).toBe('function');
+    const flags = checkStoryReadiness(
+      { title: 't', asA: ' ', iWant: 'x', soThat: 'y', tracesTo: ['INT-001'] },
+      [],
+    );
+    expect(flags).toContain('Story names a single clear actor');
   });
 });

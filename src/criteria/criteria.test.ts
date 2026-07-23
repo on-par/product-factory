@@ -7,6 +7,7 @@ import {
   buildCriteriaPrompt,
   validateScenarioCoverage,
   renderScenario,
+  checkStoryReadiness,
   CRITERIA_DIR,
   type CriteriaModelCaller,
   type GherkinScenario,
@@ -316,6 +317,48 @@ describe('generateAcceptanceCriteria', () => {
 
     expect(result.ok).toBe(true);
   });
+
+  it('flags a story that fails the readiness rubric and persists the flag (AC: flag on the story)', async () => {
+    seedApprovedDoc(dir);
+    const decomposeResult = await decomposeIntent(
+      dir,
+      DOC.id,
+      decomposeFakeCaller({
+        epic: DECOMPOSE_PAYLOAD.epic,
+        stories: [{ ...DECOMPOSE_PAYLOAD.stories[0], asA: ' ' }, DECOMPOSE_PAYLOAD.stories[1]],
+      }),
+    );
+    if (!decomposeResult.ok) throw new Error('expected ok');
+
+    const result = await generateAcceptanceCriteria(
+      dir,
+      decomposeResult.decomposition.id,
+      fakeCaller(goodPayload()),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.criteria.stories[0].readinessFlags).toContain('Story names a single clear actor');
+
+    const persisted = JSON.parse(readFileSync(result.artifactPath, 'utf8'));
+    expect(persisted.stories[0].readinessFlags).toContain('Story names a single clear actor');
+  });
+
+  it('emits no readiness flags for a fully-formed story (AC: fully formed story passes clean)', async () => {
+    const decomposition = await seedDecomposition(dir);
+
+    const result = await generateAcceptanceCriteria(
+      dir,
+      decomposition.id,
+      fakeCaller(goodPayload()),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    for (const storyCriteria of result.criteria.stories) {
+      expect(storyCriteria.readinessFlags).toEqual([]);
+    }
+  });
 });
 
 describe('renderScenario', () => {
@@ -358,6 +401,42 @@ describe('renderScenario', () => {
 
     const gherkinCheck = result.checks.find((check) => check.id === 'gherkin-acceptance-criteria');
     expect(gherkinCheck?.passed).toBe(true);
+  });
+});
+
+describe('checkStoryReadiness', () => {
+  const validScenario: GherkinScenario = {
+    name: 'Export as CSV',
+    given: ['a PM has stories to export'],
+    when: ['they request a CSV export'],
+    then: ['a CSV file is produced'],
+  };
+
+  it('flags a story with a whitespace-only actor', () => {
+    const story = { ...DECOMPOSE_PAYLOAD.stories[0], asA: ' ' };
+
+    const flags = checkStoryReadiness(story, [validScenario]);
+
+    expect(flags).toEqual(['Story names a single clear actor']);
+  });
+
+  it('returns no flags for a story with a real actor and a valid scenario', () => {
+    const story = { ...DECOMPOSE_PAYLOAD.stories[0], asA: 'PM' };
+
+    const flags = checkStoryReadiness(story, [validScenario]);
+
+    expect(flags).toEqual([]);
+  });
+
+  it('flags a story with a real actor and no scenarios', () => {
+    const story = { ...DECOMPOSE_PAYLOAD.stories[0], asA: 'PM' };
+
+    const flags = checkStoryReadiness(story, []);
+
+    expect(flags).toEqual([
+      'Story has at least one acceptance criterion',
+      'At least one acceptance criterion uses Given/When/Then',
+    ]);
   });
 });
 

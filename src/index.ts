@@ -92,6 +92,7 @@ export {
   buildCriteriaPrompt,
   validateScenarioCoverage,
   renderScenario,
+  checkStoryReadiness,
   CRITERIA_DIR,
 } from './criteria/criteria.js';
 export type {

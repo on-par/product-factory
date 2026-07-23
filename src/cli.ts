@@ -380,6 +380,7 @@ async function main(argv: readonly string[]): Promise<number> {
         criteriaId: result.criteria.id,
         stories: result.criteria.stories.length,
         scenarios: scenarioCount,
+        flaggedStories: result.criteria.stories.filter((s) => s.readinessFlags.length > 0).length,
         artifactPath: result.artifactPath,
       });
       for (const storyCriteria of result.criteria.stories) {
@@ -388,6 +389,9 @@ async function main(argv: readonly string[]): Promise<number> {
         );
         for (const scenario of storyCriteria.scenarios) {
           process.stdout.write(`${renderScenario(scenario)}\n`);
+        }
+        for (const flag of storyCriteria.readinessFlags) {
+          process.stdout.write(`  FLAG: ${flag}\n`);
         }
       }
       process.stdout.write(`${result.criteria.id}\n`);
