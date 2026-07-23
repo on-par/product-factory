@@ -10,4 +10,7 @@
 export { scoreReadiness } from './readiness/score.js';
 export type { Story, ReadinessCheck, ReadinessResult } from './readiness/score.js';
 
+export { initWorkspace, WORKSPACE_DIR, STATE_FILE } from './workspace/init.js';
+export type { InitWorkspaceResult } from './workspace/init.js';
+
 export const VERSION = '0.1.0';

@@ -7,7 +7,7 @@
  * to end and the verify gate has something to build a binary from.
  */
 
-import { VERSION, scoreReadiness, type Story } from './index.js';
+import { VERSION, initWorkspace, scoreReadiness, type Story } from './index.js';
 
 function printUsage(): void {
   process.stdout.write(
@@ -18,6 +18,7 @@ function printUsage(): void {
       '  product-factory <command>',
       '',
       'Commands:',
+      '  init               Initialize a .pf/ workspace in the current directory',
       '  version            Print the version',
       '  readiness-demo     Score a sample story against the readiness rubric v0',
       '  help               Show this help',
@@ -30,6 +31,16 @@ function main(argv: readonly string[]): number {
   const command = argv[2] ?? 'help';
 
   switch (command) {
+    case 'init': {
+      const result = initWorkspace(process.cwd());
+      if (result.created) {
+        process.stdout.write(`initialized Product Factory workspace at ${result.workspacePath}\n`);
+      } else {
+        process.stdout.write(`workspace already initialized at ${result.workspacePath}\n`);
+      }
+      return 0;
+    }
+
     case 'version':
     case '--version':
     case '-v':
