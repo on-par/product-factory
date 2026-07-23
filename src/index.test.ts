@@ -11,6 +11,9 @@ import {
   EVENTS_FILE,
   intakeTranscript,
   TRANSCRIPTS_DIR,
+  generateClarifyingQuestions,
+  createAnthropicQuestionCaller,
+  QUESTIONS_DIR,
 } from './index.js';
 
 describe('public API', () => {
@@ -42,5 +45,11 @@ describe('public API', () => {
   it('re-exports intakeTranscript and TRANSCRIPTS_DIR', () => {
     expect(typeof intakeTranscript).toBe('function');
     expect(TRANSCRIPTS_DIR).toBe('transcripts');
+  });
+
+  it('re-exports generateClarifyingQuestions and QUESTIONS_DIR', () => {
+    expect(typeof generateClarifyingQuestions).toBe('function');
+    expect(typeof createAnthropicQuestionCaller).toBe('function');
+    expect(QUESTIONS_DIR).toBe('questions');
   });
 });

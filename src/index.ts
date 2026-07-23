@@ -22,4 +22,21 @@ export type { Logger, LogLevel, LogEvent } from './log/logger.js';
 export { intakeTranscript, TRANSCRIPTS_DIR } from './intake/intake.js';
 export type { TranscriptArtifact, IntakeResult } from './intake/intake.js';
 
+export {
+  generateClarifyingQuestions,
+  analyzeGaps,
+  buildPrompt,
+  QUESTIONS_DIR,
+} from './interview/questions.js';
+export type {
+  ClarifyingQuestion,
+  QuestionsArtifact,
+  GapType,
+  GapDimension,
+  QuestionModelCaller,
+  GenerateQuestionsResult,
+} from './interview/questions.js';
+export { createAnthropicQuestionCaller } from './interview/anthropic.js';
+export type { AnthropicCallerOptions } from './interview/anthropic.js';
+
 export const VERSION = '0.1.0';
