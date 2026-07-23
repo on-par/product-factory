@@ -242,6 +242,24 @@ describe('buildIntentDoc', () => {
     expect(result.error).toContain(transcriptId);
   });
 
+  it('malformed transcriptId in the session artifact is rejected, not read as a path', async () => {
+    const { interviewId } = await seedPinned(dir, DIMENSION_QUESTIONS, {
+      '0': 'PMs',
+      '1': 'Adoption up 10%',
+      '2': 'Deadline is Q3',
+    });
+
+    const sessionPath = join(dir, WORKSPACE_DIR, 'answers', `${interviewId}.json`);
+    const session = JSON.parse(readFileSync(sessionPath, 'utf8'));
+    session.transcriptId = '../../../../etc/passwd';
+    writeFileSync(sessionPath, JSON.stringify(session, null, 2), 'utf8');
+
+    const result = buildIntentDoc(dir, interviewId);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected not ok');
+    expect(result.error).toBe('transcript ../../../../etc/passwd not found');
+  });
+
   it('pinned with no blocking questions produces only transcript statements', async () => {
     const { interviewId } = await seedPinned(dir, NO_BLOCKING, {}, GAPLESS_TEXT);
 

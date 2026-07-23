@@ -166,6 +166,10 @@ export function buildIntentDoc(targetDir: string, interviewId: string): BuildInt
     };
   }
 
+  if (!/^[0-9a-f]{12}$/.test(session.transcriptId)) {
+    return { ok: false, error: `transcript ${session.transcriptId} not found` };
+  }
+
   const transcriptPath = join(
     targetDir,
     WORKSPACE_DIR,
