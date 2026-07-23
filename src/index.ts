@@ -39,4 +39,18 @@ export type {
 export { createAnthropicQuestionCaller } from './interview/anthropic.js';
 export type { AnthropicCallerOptions } from './interview/anthropic.js';
 
+export {
+  recordAnswerRound,
+  evaluateStoppingRule,
+  isBlockingQuestion,
+  openBlockingQuestions,
+  ANSWERS_DIR,
+} from './interview/answers.js';
+export type {
+  AnswerSession,
+  SessionQuestion,
+  InterviewStatus,
+  RecordAnswersResult,
+} from './interview/answers.js';
+
 export const VERSION = '0.1.0';
