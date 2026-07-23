@@ -9,8 +9,11 @@ import {
   validateScenarioCoverage,
   renderScenario,
   checkStoryReadiness,
+  criteriaSetId,
+  saveCriteria,
   CRITERIA_DIR,
   type CriteriaModelCaller,
+  type CriteriaSet,
   type GherkinScenario,
 } from './criteria.js';
 import {
@@ -523,6 +526,67 @@ describe('validateScenarioCoverage', () => {
     expect(validateScenarioCoverage([{ storyIndex: 0 }], 2)).toEqual([
       'story index 1 has no scenarios',
     ]);
+  });
+});
+
+describe('criteriaSetId', () => {
+  it('is deterministic for the same inputs', () => {
+    const stories = goodPayload().stories.map((s) => ({
+      ...s,
+      storyTitle: 't',
+      tracesTo: ['INT-001'],
+      readinessFlags: [],
+    }));
+
+    const first = criteriaSetId('decomp-1', stories);
+    const second = criteriaSetId('decomp-1', stories);
+
+    expect(first).toBe(second);
+    expect(first).toMatch(/^[0-9a-f]{12}$/);
+  });
+
+  it('differs when a story changes', () => {
+    const stories = goodPayload().stories.map((s) => ({
+      ...s,
+      storyTitle: 't',
+      tracesTo: ['INT-001'],
+      readinessFlags: [],
+    }));
+    const changed = stories.map((s, i) =>
+      i === 0 ? { ...s, scenarios: [{ ...s.scenarios[0], name: 'Different' }] } : s,
+    );
+
+    expect(criteriaSetId('decomp-1', changed)).not.toBe(criteriaSetId('decomp-1', stories));
+  });
+});
+
+describe('saveCriteria', () => {
+  it('writes the criteria set, creating the directory, and round-trips through loadCriteria', () => {
+    const criteria: CriteriaSet = {
+      id: 'abcdefabcdef',
+      decompositionId: 'decomp-1',
+      intentId: 'intent-1',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      stories: [
+        {
+          storyIndex: 0,
+          storyTitle: 'Export CSV',
+          tracesTo: ['INT-001'],
+          scenarios: [{ name: 'Export as CSV', given: ['g'], when: ['w'], then: ['t'] }],
+          readinessFlags: [],
+        },
+      ],
+    };
+
+    const artifactPath = saveCriteria(dir, criteria);
+
+    expect(artifactPath).toBe(join(dir, WORKSPACE_DIR, CRITERIA_DIR, `${criteria.id}.json`));
+    expect(existsSync(artifactPath)).toBe(true);
+
+    const loaded = loadCriteria(dir, criteria.id);
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) throw new Error('expected ok');
+    expect(loaded.criteria).toEqual(criteria);
   });
 });
 

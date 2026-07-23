@@ -35,6 +35,13 @@ const configSchema = z
       })
       .strict()
       .default({}),
+    rework: z
+      .object({
+        threshold: z.number().min(0).max(1).default(0.8),
+        maxIterations: z.number().int().positive().default(3),
+      })
+      .strict()
+      .default({}),
   })
   .strict();
 

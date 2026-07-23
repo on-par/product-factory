@@ -29,6 +29,7 @@ import {
   generateAcceptanceCriteria,
   renderScenario,
   judgeStories,
+  reworkStories,
   WORKSPACE_DIR,
   type Story,
   type ConfigIssue,
@@ -60,6 +61,7 @@ function printUsage(): void {
       '  decompose <intentId>         Decompose an approved intent doc into an epic and traceable stories',
       '  criteria <decompositionId>   Generate Gherkin acceptance criteria for every story in a decomposition',
       '  judge <criteriaId>           Judge every story: readiness rubric + intent-alignment scores with reasons',
+      '  rework <criteriaId>          Rework low-scoring stories until they clear the threshold or the budget is spent',
       '  version            Print the version',
       '  readiness-demo     Score a sample story against the readiness rubric v0',
       '  help               Show this help',
@@ -447,6 +449,72 @@ async function main(argv: readonly string[]): Promise<number> {
         }
       }
       process.stdout.write(`${result.verdicts.id}\n`);
+      return 0;
+    }
+
+    case 'rework': {
+      const criteriaId = argv[3];
+      if (criteriaId === undefined) {
+        process.stderr.write('usage: product-factory rework <criteriaId>\n');
+        return 1;
+      }
+
+      const configResult = loadConfig(process.cwd());
+      if (!configResult.ok) {
+        printConfigIssues(configResult.issues);
+        return 1;
+      }
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (apiKey === undefined || apiKey === '') {
+        process.stderr.write('ANTHROPIC_API_KEY is not set\n');
+        return 1;
+      }
+      const callModel = createAnthropicQuestionCaller({
+        apiKey,
+        model: configResult.config.model.name,
+        // Multi-story revision and verdict JSON outgrow the 2048 default.
+        maxTokens: 4096,
+      });
+      const result = await reworkStories(
+        process.cwd(),
+        criteriaId,
+        { generate: callModel, judge: callModel },
+        {
+          threshold: configResult.config.rework.threshold,
+          maxIterations: configResult.config.rework.maxIterations,
+        },
+      );
+      if (!result.ok) {
+        process.stderr.write(`${result.error}\n`);
+        return 1;
+      }
+      const logger = createLogger(join(process.cwd(), WORKSPACE_DIR));
+      logger.info('rework loop finished', {
+        criteriaId,
+        reworkId: result.session.id,
+        status: result.session.status,
+        iterations: result.session.rounds.length - 1,
+        maxIterations: result.session.maxIterations,
+        threshold: result.session.threshold,
+        bestIteration: result.session.bestIteration,
+        bestCriteriaId: result.session.bestCriteriaId,
+        artifactPath: result.artifactPath,
+      });
+      for (const round of result.session.rounds) {
+        process.stdout.write(
+          `round ${round.iteration}: score ${round.score.toFixed(2)} (criteria ${round.criteriaId}, verdict ${round.verdictId})\n`,
+        );
+        for (const story of round.stories.filter((s) => s.score < result.session.threshold)) {
+          process.stdout.write(
+            `  [${story.storyIndex}] ${story.storyTitle} ${story.score.toFixed(2)}\n`,
+          );
+        }
+      }
+      process.stdout.write(`status: ${result.session.status}\n`);
+      process.stdout.write(
+        `best: round ${result.session.bestIteration} (criteria ${result.session.bestCriteriaId}, score ${result.session.rounds[result.session.bestIteration].score.toFixed(2)})\n`,
+      );
+      process.stdout.write(`${result.session.id}\n`);
       return 0;
     }
 
