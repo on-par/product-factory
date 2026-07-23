@@ -180,6 +180,23 @@ export function renderScenario(scenario: GherkinScenario): string {
   return lines.join('\n');
 }
 
+/** Content-derived id for a criteria set: first 12 hex chars of sha256 of decompositionId + stories JSON. */
+export function criteriaSetId(decompositionId: string, stories: readonly StoryCriteria[]): string {
+  return createHash('sha256')
+    .update(`${decompositionId}\n${JSON.stringify({ stories })}`, 'utf8')
+    .digest('hex')
+    .slice(0, 12);
+}
+
+/** Persist a criteria set to `<targetDir>/.pf/criteria/<id>.json`; returns the artifact path. */
+export function saveCriteria(targetDir: string, criteria: CriteriaSet): string {
+  const criteriaDir = join(targetDir, WORKSPACE_DIR, CRITERIA_DIR);
+  mkdirSync(criteriaDir, { recursive: true });
+  const artifactPath = join(criteriaDir, `${criteria.id}.json`);
+  writeFileSync(artifactPath, `${JSON.stringify(criteria, null, 2)}\n`, 'utf8');
+  return artifactPath;
+}
+
 function stripFences(trimmed: string): string {
   if (trimmed.startsWith('```')) {
     const withoutOpenFence = trimmed.replace(/^```[a-zA-Z]*\n?/, '');
@@ -268,10 +285,7 @@ export async function generateAcceptanceCriteria(
       };
     });
 
-  const id = createHash('sha256')
-    .update(`${decompositionId}\n${JSON.stringify({ stories })}`, 'utf8')
-    .digest('hex')
-    .slice(0, 12);
+  const id = criteriaSetId(decompositionId, stories);
 
   const criteria: CriteriaSet = {
     id,
@@ -281,10 +295,7 @@ export async function generateAcceptanceCriteria(
     stories,
   };
 
-  const criteriaDir = join(targetDir, WORKSPACE_DIR, CRITERIA_DIR);
-  mkdirSync(criteriaDir, { recursive: true });
-  const artifactPath = join(criteriaDir, `${id}.json`);
-  writeFileSync(artifactPath, `${JSON.stringify(criteria, null, 2)}\n`, 'utf8');
+  const artifactPath = saveCriteria(targetDir, criteria);
 
   return { ok: true, criteria, artifactPath };
 }

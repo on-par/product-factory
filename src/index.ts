@@ -94,6 +94,8 @@ export {
   validateScenarioCoverage,
   renderScenario,
   checkStoryReadiness,
+  criteriaSetId,
+  saveCriteria,
   CRITERIA_DIR,
 } from './criteria/criteria.js';
 export type {
@@ -112,5 +114,25 @@ export {
   VERDICTS_DIR,
 } from './judge/judge.js';
 export type { StoryVerdict, VerdictSet, JudgeModelCaller, JudgeResult } from './judge/judge.js';
+
+export {
+  reworkStories,
+  buildReworkPrompt,
+  evaluateReworkStopping,
+  validateRevisionCoverage,
+  combinedScore,
+  bestRound,
+  REWORKS_DIR,
+} from './rework/rework.js';
+export type {
+  StoryScore,
+  ReworkRound,
+  ReworkSession,
+  ReworkStatus,
+  ReworkModelCaller,
+  ReworkCallers,
+  ReworkOptions,
+  ReworkResult,
+} from './rework/rework.js';
 
 export const VERSION = '0.1.0';

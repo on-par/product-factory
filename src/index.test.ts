@@ -18,6 +18,13 @@ import {
   evaluateStoppingRule,
   ANSWERS_DIR,
   checkStoryReadiness,
+  reworkStories,
+  buildReworkPrompt,
+  evaluateReworkStopping,
+  validateRevisionCoverage,
+  combinedScore,
+  bestRound,
+  REWORKS_DIR,
 } from './index.js';
 
 describe('public API', () => {
@@ -70,5 +77,15 @@ describe('public API', () => {
       [],
     );
     expect(flags).toContain('Story names a single clear actor');
+  });
+
+  it('re-exports the rework loop surface and REWORKS_DIR', () => {
+    expect(typeof reworkStories).toBe('function');
+    expect(typeof buildReworkPrompt).toBe('function');
+    expect(typeof evaluateReworkStopping).toBe('function');
+    expect(typeof validateRevisionCoverage).toBe('function');
+    expect(typeof combinedScore).toBe('function');
+    expect(typeof bestRound).toBe('function');
+    expect(REWORKS_DIR).toBe('reworks');
   });
 });

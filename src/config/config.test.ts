@@ -25,6 +25,7 @@ describe('loadConfig', () => {
       model: { provider: 'anthropic', name: 'claude-sonnet-4-5' },
       budget: { maxUsdPerRun: 5 },
       interview: { maxRounds: 3 },
+      rework: { threshold: 0.8, maxIterations: 3 },
     });
   });
 
@@ -51,6 +52,7 @@ describe('loadConfig', () => {
       model: { provider: 'openai', name: 'gpt-4o' },
       budget: { maxUsdPerRun: 12.5 },
       interview: { maxRounds: 4 },
+      rework: { threshold: 0.9, maxIterations: 5 },
     };
     writeFileSync(join(dir, CONFIG_FILE), JSON.stringify(full), 'utf8');
 
@@ -107,6 +109,40 @@ describe('loadConfig', () => {
     if (result.ok) return;
     expect(result.issues).toHaveLength(1);
     expect(result.issues[0]?.path).toBe('interview.maxRounds');
+  });
+
+  it('rejects an out-of-range rework.threshold', () => {
+    writeFileSync(join(dir, CONFIG_FILE), JSON.stringify({ rework: { threshold: 2 } }), 'utf8');
+
+    const result = loadConfig(dir);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.issues).toHaveLength(1);
+    expect(result.issues[0]?.path).toBe('rework.threshold');
+  });
+
+  it('rejects a non-positive rework.maxIterations', () => {
+    writeFileSync(join(dir, CONFIG_FILE), JSON.stringify({ rework: { maxIterations: 0 } }), 'utf8');
+
+    const result = loadConfig(dir);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.issues).toHaveLength(1);
+    expect(result.issues[0]?.path).toBe('rework.maxIterations');
+  });
+
+  it('rejects an unknown rework field', () => {
+    writeFileSync(join(dir, CONFIG_FILE), JSON.stringify({ rework: { unknown: 1 } }), 'utf8');
+
+    const result = loadConfig(dir);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const issue = result.issues.find((i) => i.message.includes('unknown'));
+    expect(issue).toBeDefined();
+    expect(issue?.path).toBe('rework');
   });
 
   it('rejects malformed JSON', () => {
