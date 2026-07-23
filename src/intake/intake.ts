@@ -36,8 +36,11 @@ export type IntakeResult =
     }
   | { readonly ok: false; readonly error: string };
 
+/** UTF-8 byte order mark, stripped from the start of input if present. */
+const BOM = '\uFEFF';
+
 function normalize(raw: string): string {
-  const withoutBom = raw.startsWith('﻿') ? raw.slice(1) : raw;
+  const withoutBom = raw.startsWith(BOM) ? raw.slice(1) : raw;
   const withUnixEol = withoutBom.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   const withoutLeadingBlankLines = withUnixEol.replace(/^(?:[ \t]*\n)+/, '');
   const trimmed = withoutLeadingBlankLines.replace(/\s+$/, '');
