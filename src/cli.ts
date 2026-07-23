@@ -8,6 +8,7 @@
  */
 
 import { readFileSync } from 'node:fs';
+import { userInfo } from 'node:os';
 import { join } from 'node:path';
 import {
   VERSION,
@@ -21,6 +22,8 @@ import {
   recordAnswerRound,
   openBlockingQuestions,
   buildIntentDoc,
+  approveIntentDoc,
+  loadIntentApproval,
   WORKSPACE_DIR,
   type Story,
   type ConfigIssue,
@@ -48,6 +51,8 @@ function printUsage(): void {
       '  interview questions <transcriptId>   Generate gap-tagged clarifying questions for a transcript',
       '  interview answer <questionsId> <file>      Record a round of answers (use "-" for stdin) and apply the stopping rule',
       '  intent build <interviewId>   Build the intent doc from a pinned interview',
+      '  intent approve <intentId>    Approve the intent doc (human gate #1)',
+      '  decompose <intentId>         Decompose an approved intent doc (gated; logic arrives with epic #4)',
       '  version            Print the version',
       '  readiness-demo     Score a sample story against the readiness rubric v0',
       '  help               Show this help',
@@ -227,30 +232,73 @@ async function main(argv: readonly string[]): Promise<number> {
     }
 
     case 'intent': {
-      const usage = 'usage: product-factory intent build <interviewId>\n';
+      const usage =
+        'usage: product-factory intent build <interviewId> | intent approve <intentId>\n';
 
-      if (argv[3] !== 'build' || argv[4] === undefined) {
-        process.stderr.write(usage);
+      if (argv[3] === 'build' && argv[4] !== undefined) {
+        const result = buildIntentDoc(process.cwd(), argv[4]);
+        if (!result.ok) {
+          process.stderr.write(`${result.error}\n`);
+          return 1;
+        }
+        const logger = createLogger(join(process.cwd(), WORKSPACE_DIR));
+        logger.info('intent doc built', {
+          interviewId: argv[4],
+          intentId: result.doc.id,
+          statements: result.doc.statements.length,
+          docPath: result.docPath,
+        });
+        for (const statement of result.doc.statements) {
+          process.stdout.write(`[${statement.id}] ${statement.text}\n`);
+        }
+        process.stdout.write(`${result.doc.id}\n`);
+        return 0;
+      }
+
+      if (argv[3] === 'approve' && argv[4] !== undefined) {
+        const approver = process.env.PF_APPROVER ?? userInfo().username;
+        const result = approveIntentDoc(process.cwd(), argv[4], approver);
+        if (!result.ok) {
+          process.stderr.write(`${result.error}\n`);
+          return 1;
+        }
+        const logger = createLogger(join(process.cwd(), WORKSPACE_DIR));
+        logger.info('intent doc approved', {
+          intentId: argv[4],
+          approvedBy: result.approval.approvedBy,
+          approvedAt: result.approval.approvedAt,
+          alreadyApproved: result.alreadyApproved,
+          approvalPath: result.approvalPath,
+        });
+        process.stdout.write(
+          result.alreadyApproved
+            ? `intent doc ${argv[4]} already approved by ${result.approval.approvedBy} at ${result.approval.approvedAt}\n`
+            : `intent doc ${argv[4]} approved by ${result.approval.approvedBy} at ${result.approval.approvedAt}\n`,
+        );
+        return 0;
+      }
+
+      process.stderr.write(usage);
+      return 1;
+    }
+
+    case 'decompose': {
+      const intentId = argv[3];
+      if (intentId === undefined) {
+        process.stderr.write('usage: product-factory decompose <intentId>\n');
         return 1;
       }
-
-      const result = buildIntentDoc(process.cwd(), argv[4]);
-      if (!result.ok) {
-        process.stderr.write(`${result.error}\n`);
+      const approval = loadIntentApproval(process.cwd(), intentId);
+      if (!approval.ok) {
+        process.stderr.write(
+          `intent doc not approved: run "pf intent approve ${intentId}" first (human gate #1)\n`,
+        );
+        const logger = createLogger(join(process.cwd(), WORKSPACE_DIR));
+        logger.warn('decomposition refused: intent doc not approved', { intentId });
         return 1;
       }
-      const logger = createLogger(join(process.cwd(), WORKSPACE_DIR));
-      logger.info('intent doc built', {
-        interviewId: argv[4],
-        intentId: result.doc.id,
-        statements: result.doc.statements.length,
-        docPath: result.docPath,
-      });
-      for (const statement of result.doc.statements) {
-        process.stdout.write(`[${statement.id}] ${statement.text}\n`);
-      }
-      process.stdout.write(`${result.doc.id}\n`);
-      return 0;
+      process.stderr.write('decomposition is not implemented yet (epic #4)\n');
+      return 1;
     }
 
     case 'version':
