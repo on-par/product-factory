@@ -194,14 +194,23 @@ export async function generateClarifyingQuestions(
   transcriptId: string,
   callModel: QuestionModelCaller,
 ): Promise<GenerateQuestionsResult> {
+  if (!/^[0-9a-f]{12}$/.test(transcriptId)) {
+    return { ok: false, error: `transcript ${transcriptId} not found` };
+  }
+
   const transcriptsDir = join(targetDir, WORKSPACE_DIR, TRANSCRIPTS_DIR);
   const transcriptPath = join(transcriptsDir, `${transcriptId}.json`);
 
   let raw: string;
   try {
     raw = readFileSync(transcriptPath, 'utf8');
-  } catch {
-    return { ok: false, error: `transcript ${transcriptId} not found` };
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') {
+      return { ok: false, error: `transcript ${transcriptId} not found` };
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: `unable to read transcript ${transcriptId}: ${message}` };
   }
 
   let parsedTranscript: unknown;

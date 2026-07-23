@@ -152,10 +152,41 @@ describe('generateClarifyingQuestions', () => {
   it('corrupt transcript artifact returns an error', async () => {
     const transcriptsDir = join(dir, WORKSPACE_DIR, 'transcripts');
     mkdirSync(transcriptsDir, { recursive: true });
-    writeFileSync(join(transcriptsDir, 'abc.json'), 'not valid json{', 'utf8');
+    writeFileSync(join(transcriptsDir, 'abcabcabcabc.json'), 'not valid json{', 'utf8');
 
-    const result = await generateClarifyingQuestions(dir, 'abc', fakeCaller([]));
+    const result = await generateClarifyingQuestions(dir, 'abcabcabcabc', fakeCaller([]));
     expect(result.ok).toBe(false);
+  });
+
+  it('transcript artifact failing shape validation returns an error', async () => {
+    const transcriptsDir = join(dir, WORKSPACE_DIR, 'transcripts');
+    mkdirSync(transcriptsDir, { recursive: true });
+    writeFileSync(
+      join(transcriptsDir, 'abcabcabcabc.json'),
+      JSON.stringify({ foo: 'bar' }),
+      'utf8',
+    );
+
+    const result = await generateClarifyingQuestions(dir, 'abcabcabcabc', fakeCaller([]));
+    expect(result.ok).toBe(false);
+  });
+
+  it('rejects a malformed transcriptId (e.g. path traversal attempts) without touching the filesystem', async () => {
+    const result = await generateClarifyingQuestions(dir, '../../../etc/passwd', fakeCaller([]));
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected not ok');
+    expect(result.error).toContain('not found');
+  });
+
+  it('distinguishes a real read error from a missing transcript', async () => {
+    const transcriptsDir = join(dir, WORKSPACE_DIR, 'transcripts');
+    const transcriptId = 'abcabcabcabc';
+    mkdirSync(join(transcriptsDir, `${transcriptId}.json`), { recursive: true });
+
+    const result = await generateClarifyingQuestions(dir, transcriptId, fakeCaller([]));
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected not ok');
+    expect(result.error).not.toContain('not found');
   });
 
   it('throwing caller returns an error containing the thrown message', async () => {
