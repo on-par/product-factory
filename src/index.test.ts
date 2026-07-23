@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { VERSION, scoreReadiness, initWorkspace, WORKSPACE_DIR, STATE_FILE } from './index.js';
+import {
+  VERSION,
+  scoreReadiness,
+  initWorkspace,
+  WORKSPACE_DIR,
+  STATE_FILE,
+  loadConfig,
+  CONFIG_FILE,
+} from './index.js';
 
 describe('public API', () => {
   it('exports a version string', () => {
@@ -15,5 +23,10 @@ describe('public API', () => {
     expect(typeof initWorkspace).toBe('function');
     expect(WORKSPACE_DIR).toBe('.pf');
     expect(STATE_FILE).toBe('state.json');
+  });
+
+  it('re-exports loadConfig and CONFIG_FILE', () => {
+    expect(typeof loadConfig).toBe('function');
+    expect(CONFIG_FILE).toBe('product-factory.json');
   });
 });
