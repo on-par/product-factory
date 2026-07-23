@@ -1,0 +1,50 @@
+{
+  "name": "@on-par/product-factory",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Agentic product delivery factory — turns high-level product intent into engineering-ready work through a collaborating multi-agent refinement loop.",
+  "type": "module",
+  "bin": {
+    "product-factory": "./dist/cli.js",
+    "pf": "./dist/cli.js"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsx src/cli.ts",
+    "typecheck": "tsc -b --noEmit || tsc --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run --coverage",
+    "clean": "rm -rf dist node_modules/.cache"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^22.10.0",
+    "@vitest/coverage-v8": "^2.1.8",
+    "eslint": "^9.17.0",
+    "prettier": "3.4.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.0",
+    "vitest": "^2.1.8"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/on-par/product-factory.git"
+  },
+  "homepage": "https://github.com/on-par/product-factory#readme",
+  "bugs": {
+    "url": "https://github.com/on-par/product-factory/issues"
+  }
+}
