@@ -62,4 +62,12 @@ export type {
   LoadIntentResult,
 } from './intent/build.js';
 
+export {
+  approveIntentDoc,
+  loadIntentApproval,
+  isIntentApproved,
+  APPROVAL_SUFFIX,
+} from './intent/approve.js';
+export type { IntentApproval, ApproveIntentResult, LoadApprovalResult } from './intent/approve.js';
+
 export const VERSION = '0.1.0';
