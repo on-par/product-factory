@@ -1,9 +1,10 @@
-import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   judgeStories,
+  loadVerdicts,
   buildJudgePrompt,
   validateAlignmentReasons,
   VERDICTS_DIR,
@@ -350,6 +351,47 @@ describe('judgeStories', () => {
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('expected not ok');
     expect(result.error).toBe(`criteria set ${criteria.id} has no story at index 1`);
+  });
+});
+
+describe('loadVerdicts', () => {
+  it('round-trips a verdict set written by judgeStories', async () => {
+    const { criteria } = await seedCriteria(dir);
+    const written = await judgeStories(dir, criteria.id, judgeFakeCaller(goodJudgePayload()));
+    if (!written.ok) throw new Error('expected ok');
+
+    const result = loadVerdicts(dir, written.verdicts.id);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.verdicts).toEqual(written.verdicts);
+    expect(result.artifactPath).toBe(written.artifactPath);
+  });
+
+  it('malformed verdict id returns not found', () => {
+    const result = loadVerdicts(dir, 'nope');
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected not ok');
+    expect(result.error).toBe('verdict set nope not found');
+  });
+
+  it('absent verdict file returns not found', () => {
+    const result = loadVerdicts(dir, 'ffffffffffff');
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected not ok');
+    expect(result.error).toBe('verdict set ffffffffffff not found');
+  });
+
+  it('a file containing an unrelated shape returns "is not a valid verdict set"', () => {
+    const verdictsDir = join(dir, WORKSPACE_DIR, VERDICTS_DIR);
+    mkdirSync(verdictsDir, { recursive: true });
+    writeFileSync(join(verdictsDir, 'abcabcabcabc.json'), JSON.stringify({ nope: true }), 'utf8');
+
+    const result = loadVerdicts(dir, 'abcabcabcabc');
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected not ok');
+    expect(result.error).toBe('verdict set abcabcabcabc is not a valid verdict set');
   });
 });
 

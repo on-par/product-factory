@@ -41,6 +41,7 @@ export type { AnthropicCallerOptions } from './interview/anthropic.js';
 
 export {
   recordAnswerRound,
+  loadAnswerSession,
   evaluateStoppingRule,
   isBlockingQuestion,
   openBlockingQuestions,
@@ -51,6 +52,7 @@ export type {
   SessionQuestion,
   InterviewStatus,
   RecordAnswersResult,
+  LoadAnswerSessionResult,
 } from './interview/answers.js';
 
 export { buildIntentDoc, loadIntentDoc, saveIntentDoc, INTENT_DIR } from './intent/build.js';
@@ -109,11 +111,18 @@ export type {
 
 export {
   judgeStories,
+  loadVerdicts,
   buildJudgePrompt,
   validateAlignmentReasons,
   VERDICTS_DIR,
 } from './judge/judge.js';
-export type { StoryVerdict, VerdictSet, JudgeModelCaller, JudgeResult } from './judge/judge.js';
+export type {
+  StoryVerdict,
+  VerdictSet,
+  JudgeModelCaller,
+  JudgeResult,
+  LoadVerdictsResult,
+} from './judge/judge.js';
 
 export {
   reworkStories,
@@ -134,5 +143,18 @@ export type {
   ReworkOptions,
   ReworkResult,
 } from './rework/rework.js';
+
+export {
+  buildReadinessReport,
+  renderReadinessReport,
+  collectOpenQuestions,
+  REPORTS_DIR,
+} from './report/report.js';
+export type {
+  ReportStory,
+  ReportOpenQuestion,
+  ReadinessReport,
+  BuildReportResult,
+} from './report/report.js';
 
 export const VERSION = '0.1.0';

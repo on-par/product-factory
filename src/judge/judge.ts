@@ -5,7 +5,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { WORKSPACE_DIR } from '../workspace/init.js';
@@ -55,6 +55,10 @@ export type JudgeResult =
   | { readonly ok: true; readonly verdicts: VerdictSet; readonly artifactPath: string }
   | { readonly ok: false; readonly error: string };
 
+export type LoadVerdictsResult =
+  | { readonly ok: true; readonly verdicts: VerdictSet; readonly artifactPath: string }
+  | { readonly ok: false; readonly error: string };
+
 const judgeResponseSchema = z.object({
   stories: z
     .array(
@@ -62,6 +66,27 @@ const judgeResponseSchema = z.object({
         storyIndex: z.number().int().min(0),
         intentAlignmentScore: z.number().min(0).max(1),
         reasons: z.array(z.string().min(1)),
+      }),
+    )
+    .min(1),
+});
+
+const persistedVerdictsSchema = z.object({
+  id: z.string().regex(/^[0-9a-f]{12}$/),
+  criteriaId: z.string().min(1),
+  decompositionId: z.string().min(1),
+  intentId: z.string().min(1),
+  createdAt: z.string().min(1),
+  stories: z
+    .array(
+      z.object({
+        storyIndex: z.number().int().min(0),
+        storyTitle: z.string().min(1),
+        tracesTo: z.array(z.string().min(1)).min(1),
+        readinessScore: z.number().min(0).max(1),
+        readinessReasons: z.array(z.string()),
+        intentAlignmentScore: z.number().min(0).max(1),
+        intentAlignmentReasons: z.array(z.string()),
       }),
     )
     .min(1),
@@ -272,4 +297,38 @@ export async function judgeStories(
   writeFileSync(artifactPath, `${JSON.stringify(verdicts, null, 2)}\n`, 'utf8');
 
   return { ok: true, verdicts, artifactPath };
+}
+
+/** Load a previously persisted verdict set from `<targetDir>/.pf/verdicts/<verdictId>.json`. */
+export function loadVerdicts(targetDir: string, verdictId: string): LoadVerdictsResult {
+  if (!/^[0-9a-f]{12}$/.test(verdictId)) {
+    return { ok: false, error: `verdict set ${verdictId} not found` };
+  }
+
+  const artifactPath = join(targetDir, WORKSPACE_DIR, VERDICTS_DIR, `${verdictId}.json`);
+  let raw: string;
+  try {
+    raw = readFileSync(artifactPath, 'utf8');
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') {
+      return { ok: false, error: `verdict set ${verdictId} not found` };
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: `unable to read verdict set ${verdictId}: ${message}` };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ok: false, error: `verdict set ${verdictId} is not a valid verdict set` };
+  }
+
+  const result = persistedVerdictsSchema.safeParse(parsed);
+  if (!result.success) {
+    return { ok: false, error: `verdict set ${verdictId} is not a valid verdict set` };
+  }
+
+  return { ok: true, verdicts: result.data as VerdictSet, artifactPath };
 }
