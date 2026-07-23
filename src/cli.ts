@@ -18,6 +18,8 @@ import {
   intakeTranscript,
   generateClarifyingQuestions,
   createAnthropicQuestionCaller,
+  recordAnswerRound,
+  openBlockingQuestions,
   WORKSPACE_DIR,
   type Story,
 } from './index.js';
@@ -35,6 +37,7 @@ function printUsage(): void {
       '  config             Print the resolved product-factory.json config as JSON',
       '  intake <file>      Ingest a brain-dump (use "-" to read stdin) into a transcript artifact',
       '  interview questions <transcriptId>   Generate gap-tagged clarifying questions for a transcript',
+      '  interview answer <questionsId> <file>      Record a round of answers (use "-" for stdin) and apply the stopping rule',
       '  version            Print the version',
       '  readiness-demo     Score a sample story against the readiness rubric v0',
       '  help               Show this help',
@@ -105,44 +108,121 @@ async function main(argv: readonly string[]): Promise<number> {
     }
 
     case 'interview': {
-      if (argv[3] !== 'questions' || argv[4] === undefined) {
-        process.stderr.write('usage: product-factory interview questions <transcriptId>\n');
-        return 1;
-      }
-      const configResult = loadConfig(process.cwd());
-      if (!configResult.ok) {
-        process.stderr.write('invalid product-factory.json:\n');
-        for (const issue of configResult.issues) {
-          process.stderr.write(`  ${issue.path}: ${issue.message}\n`);
+      const usage =
+        'usage: product-factory interview questions <transcriptId> | interview answer <questionsId> <answersFile>\n';
+
+      if (argv[3] === 'questions') {
+        if (argv[4] === undefined) {
+          process.stderr.write(usage);
+          return 1;
         }
-        return 1;
+        const configResult = loadConfig(process.cwd());
+        if (!configResult.ok) {
+          process.stderr.write('invalid product-factory.json:\n');
+          for (const issue of configResult.issues) {
+            process.stderr.write(`  ${issue.path}: ${issue.message}\n`);
+          }
+          return 1;
+        }
+        const apiKey = process.env.ANTHROPIC_API_KEY;
+        if (apiKey === undefined || apiKey === '') {
+          process.stderr.write('ANTHROPIC_API_KEY is not set\n');
+          return 1;
+        }
+        const callModel = createAnthropicQuestionCaller({
+          apiKey,
+          model: configResult.config.model.name,
+        });
+        const result = await generateClarifyingQuestions(process.cwd(), argv[4], callModel);
+        if (!result.ok) {
+          process.stderr.write(`${result.error}\n`);
+          return 1;
+        }
+        const logger = createLogger(join(process.cwd(), WORKSPACE_DIR));
+        logger.info('clarifying questions generated', {
+          transcriptId: result.artifact.transcriptId,
+          questionsId: result.artifact.id,
+          count: result.artifact.questions.length,
+          artifactPath: result.artifactPath,
+        });
+        for (const question of result.artifact.questions) {
+          process.stdout.write(`[${question.gapType}] ${question.question}\n`);
+        }
+        process.stdout.write(`${result.artifact.id}\n`);
+        return 0;
       }
-      const apiKey = process.env.ANTHROPIC_API_KEY;
-      if (apiKey === undefined || apiKey === '') {
-        process.stderr.write('ANTHROPIC_API_KEY is not set\n');
-        return 1;
+
+      if (argv[3] === 'answer') {
+        const questionsId = argv[4];
+        const file = argv[5];
+        if (questionsId === undefined || file === undefined) {
+          process.stderr.write(usage);
+          return 1;
+        }
+        let raw: string;
+        const source = file === '-' ? 'stdin' : file;
+        try {
+          raw = file === '-' ? readFileSync(0, 'utf8') : readFileSync(file, 'utf8');
+        } catch {
+          process.stderr.write(`cannot read ${source}\n`);
+          return 1;
+        }
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          process.stderr.write('invalid answers JSON\n');
+          return 1;
+        }
+        if (
+          typeof parsed !== 'object' ||
+          parsed === null ||
+          Array.isArray(parsed) ||
+          Object.values(parsed).some((value) => typeof value !== 'string')
+        ) {
+          process.stderr.write('invalid answers JSON\n');
+          return 1;
+        }
+        const answers = parsed as Record<string, string>;
+
+        const configResult = loadConfig(process.cwd());
+        if (!configResult.ok) {
+          process.stderr.write('invalid product-factory.json:\n');
+          for (const issue of configResult.issues) {
+            process.stderr.write(`  ${issue.path}: ${issue.message}\n`);
+          }
+          return 1;
+        }
+
+        const result = recordAnswerRound(process.cwd(), questionsId, answers, {
+          maxRounds: configResult.config.interview.maxRounds,
+        });
+        if (!result.ok) {
+          process.stderr.write(`${result.error}\n`);
+          return 1;
+        }
+        const logger = createLogger(join(process.cwd(), WORKSPACE_DIR));
+        const open = openBlockingQuestions(result.session);
+        logger.info('answers recorded', {
+          questionsId,
+          status: result.session.status,
+          round: result.session.roundsCompleted,
+          maxRounds: result.session.maxRounds,
+          open: open.length,
+          sessionPath: result.sessionPath,
+        });
+        process.stdout.write(`status: ${result.session.status}\n`);
+        if (result.session.status !== 'pinned') {
+          process.stdout.write('open questions:\n');
+          for (const question of open) {
+            process.stdout.write(`  [${question.index}] ${question.question.question}\n`);
+          }
+        }
+        return 0;
       }
-      const callModel = createAnthropicQuestionCaller({
-        apiKey,
-        model: configResult.config.model.name,
-      });
-      const result = await generateClarifyingQuestions(process.cwd(), argv[4], callModel);
-      if (!result.ok) {
-        process.stderr.write(`${result.error}\n`);
-        return 1;
-      }
-      const logger = createLogger(join(process.cwd(), WORKSPACE_DIR));
-      logger.info('clarifying questions generated', {
-        transcriptId: result.artifact.transcriptId,
-        questionsId: result.artifact.id,
-        count: result.artifact.questions.length,
-        artifactPath: result.artifactPath,
-      });
-      for (const question of result.artifact.questions) {
-        process.stdout.write(`[${question.gapType}] ${question.question}\n`);
-      }
-      process.stdout.write(`${result.artifact.id}\n`);
-      return 0;
+
+      process.stderr.write(usage);
+      return 1;
     }
 
     case 'version':

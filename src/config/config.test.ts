@@ -24,6 +24,7 @@ describe('loadConfig', () => {
     expect(result.config).toEqual({
       model: { provider: 'anthropic', name: 'claude-sonnet-4-5' },
       budget: { maxUsdPerRun: 5 },
+      interview: { maxRounds: 3 },
     });
   });
 
@@ -41,6 +42,7 @@ describe('loadConfig', () => {
     expect(result.config.model.provider).toBe('openai');
     expect(result.config.model.name).toBe('claude-sonnet-4-5');
     expect(result.config.budget.maxUsdPerRun).toBe(5);
+    expect(result.config.interview.maxRounds).toBe(3);
     expect(result.configPath).toBe(join(dir, CONFIG_FILE));
   });
 
@@ -48,6 +50,7 @@ describe('loadConfig', () => {
     const full = {
       model: { provider: 'openai', name: 'gpt-4o' },
       budget: { maxUsdPerRun: 12.5 },
+      interview: { maxRounds: 4 },
     };
     writeFileSync(join(dir, CONFIG_FILE), JSON.stringify(full), 'utf8');
 
@@ -93,6 +96,17 @@ describe('loadConfig', () => {
     if (result.ok) return;
     expect(result.issues).toHaveLength(1);
     expect(result.issues[0]?.path).toBe('budget.maxUsdPerRun');
+  });
+
+  it('rejects a non-positive interview.maxRounds', () => {
+    writeFileSync(join(dir, CONFIG_FILE), JSON.stringify({ interview: { maxRounds: 0 } }), 'utf8');
+
+    const result = loadConfig(dir);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.issues).toHaveLength(1);
+    expect(result.issues[0]?.path).toBe('interview.maxRounds');
   });
 
   it('rejects malformed JSON', () => {

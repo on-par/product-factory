@@ -29,6 +29,12 @@ const configSchema = z
       })
       .strict()
       .default({}),
+    interview: z
+      .object({
+        maxRounds: z.number().int().positive().default(3),
+      })
+      .strict()
+      .default({}),
   })
   .strict();
 

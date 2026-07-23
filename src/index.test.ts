@@ -14,6 +14,9 @@ import {
   generateClarifyingQuestions,
   createAnthropicQuestionCaller,
   QUESTIONS_DIR,
+  recordAnswerRound,
+  evaluateStoppingRule,
+  ANSWERS_DIR,
 } from './index.js';
 
 describe('public API', () => {
@@ -51,5 +54,11 @@ describe('public API', () => {
     expect(typeof generateClarifyingQuestions).toBe('function');
     expect(typeof createAnthropicQuestionCaller).toBe('function');
     expect(QUESTIONS_DIR).toBe('questions');
+  });
+
+  it('re-exports recordAnswerRound and ANSWERS_DIR', () => {
+    expect(typeof recordAnswerRound).toBe('function');
+    expect(typeof evaluateStoppingRule).toBe('function');
+    expect(ANSWERS_DIR).toBe('answers');
   });
 });
