@@ -70,4 +70,19 @@ export {
 } from './intent/approve.js';
 export type { IntentApproval, ApproveIntentResult, LoadApprovalResult } from './intent/approve.js';
 
+export {
+  decomposeIntent,
+  buildDecomposePrompt,
+  validateTraceability,
+  storySentence,
+  DECOMPOSITIONS_DIR,
+} from './decompose/decompose.js';
+export type {
+  Epic,
+  DecomposedStory,
+  Decomposition,
+  DecomposeModelCaller,
+  DecomposeResult,
+} from './decompose/decompose.js';
+
 export const VERSION = '0.1.0';

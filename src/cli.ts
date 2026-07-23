@@ -24,6 +24,8 @@ import {
   buildIntentDoc,
   approveIntentDoc,
   loadIntentApproval,
+  decomposeIntent,
+  storySentence,
   WORKSPACE_DIR,
   type Story,
   type ConfigIssue,
@@ -52,7 +54,7 @@ function printUsage(): void {
       '  interview answer <questionsId> <file>      Record a round of answers (use "-" for stdin) and apply the stopping rule',
       '  intent build <interviewId>   Build the intent doc from a pinned interview',
       '  intent approve <intentId>    Approve the intent doc (human gate #1)',
-      '  decompose <intentId>         Decompose an approved intent doc (gated; logic arrives with epic #4)',
+      '  decompose <intentId>         Decompose an approved intent doc into an epic and traceable stories',
       '  version            Print the version',
       '  readiness-demo     Score a sample story against the readiness rubric v0',
       '  help               Show this help',
@@ -297,8 +299,41 @@ async function main(argv: readonly string[]): Promise<number> {
         logger.warn('decomposition refused: intent doc not approved', { intentId });
         return 1;
       }
-      process.stderr.write('decomposition is not implemented yet (epic #4)\n');
-      return 1;
+
+      const configResult = loadConfig(process.cwd());
+      if (!configResult.ok) {
+        printConfigIssues(configResult.issues);
+        return 1;
+      }
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (apiKey === undefined || apiKey === '') {
+        process.stderr.write('ANTHROPIC_API_KEY is not set\n');
+        return 1;
+      }
+      const callModel = createAnthropicQuestionCaller({
+        apiKey,
+        model: configResult.config.model.name,
+      });
+      const result = await decomposeIntent(process.cwd(), intentId, callModel);
+      if (!result.ok) {
+        process.stderr.write(`${result.error}\n`);
+        return 1;
+      }
+      const logger = createLogger(join(process.cwd(), WORKSPACE_DIR));
+      logger.info('intent decomposed', {
+        intentId,
+        decompositionId: result.decomposition.id,
+        stories: result.decomposition.stories.length,
+        artifactPath: result.artifactPath,
+      });
+      process.stdout.write(`epic: ${result.decomposition.epic.title}\n`);
+      result.decomposition.stories.forEach((story, index) => {
+        process.stdout.write(
+          `[${index}] ${story.title} — ${storySentence(story)} (traces-to: ${story.tracesTo.join(', ')})\n`,
+        );
+      });
+      process.stdout.write(`${result.decomposition.id}\n`);
+      return 0;
     }
 
     case 'version':
