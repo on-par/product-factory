@@ -61,24 +61,40 @@ export function approveIntentDoc(
     return { ok: false, error: docResult.error };
   }
 
-  const existing = loadIntentApproval(targetDir, intentId);
-  if (existing.ok) {
-    return {
-      ok: true,
-      approval: existing.approval,
-      approvalPath: existing.approvalPath,
-      alreadyApproved: true,
-    };
-  }
-
   const approval: IntentApproval = {
     intentId,
     approvedBy: approvedBy.trim(),
     approvedAt: new Date().toISOString(),
   };
   const path = approvalPath(targetDir, intentId);
-  writeFileSync(path, `${JSON.stringify(approval, null, 2)}\n`, 'utf8');
-  return { ok: true, approval, approvalPath: path, alreadyApproved: false };
+
+  // Exclusive create, not check-then-write: two concurrent approvers racing
+  // loadIntentApproval would otherwise both see "unapproved" and the second
+  // write would silently clobber the first, breaking "first approver wins".
+  try {
+    writeFileSync(path, `${JSON.stringify(approval, null, 2)}\n`, { flag: 'wx' });
+    return { ok: true, approval, approvalPath: path, alreadyApproved: false };
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code !== 'EEXIST') {
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        ok: false,
+        error: `unable to write approval for intent doc ${intentId}: ${message}`,
+      };
+    }
+  }
+
+  const existing = loadIntentApproval(targetDir, intentId);
+  if (!existing.ok) {
+    return existing;
+  }
+  return {
+    ok: true,
+    approval: existing.approval,
+    approvalPath: existing.approvalPath,
+    alreadyApproved: true,
+  };
 }
 
 /** Load the approval marker for an intent doc, if one exists. */

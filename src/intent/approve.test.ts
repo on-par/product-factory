@@ -88,6 +88,32 @@ describe('approveIntentDoc', () => {
     expect(second.approval.approvedAt).toBe(first.approval.approvedAt);
   });
 
+  it('a concurrent winner is never clobbered by a racing approver (TOCTOU-safe write)', async () => {
+    const docId = await seedDoc(dir);
+
+    // Simulate another process's approval landing between our loadIntentDoc
+    // check and our write, by seeding the marker file before we ever call
+    // approveIntentDoc.
+    const intentDir = join(dir, WORKSPACE_DIR, INTENT_DIR);
+    mkdirSync(intentDir, { recursive: true });
+    const winner = {
+      intentId: docId,
+      approvedBy: 'first-approver',
+      approvedAt: '2020-01-01T00:00:00.000Z',
+    };
+    writeFileSync(
+      join(intentDir, `${docId}.approval.json`),
+      JSON.stringify(winner, null, 2),
+      'utf8',
+    );
+
+    const result = approveIntentDoc(dir, docId, 'second-approver');
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.alreadyApproved).toBe(true);
+    expect(result.approval).toEqual(winner);
+  });
+
   it('fails for a missing doc', () => {
     const result = approveIntentDoc(dir, '0123456789ab', 'patrick');
     expect(result.ok).toBe(false);
