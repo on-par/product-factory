@@ -7,12 +7,16 @@
  * to end and the verify gate has something to build a binary from.
  */
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   VERSION,
   initWorkspace,
   scoreReadiness,
   loadConfig,
   createLogger,
+  intakeTranscript,
+  WORKSPACE_DIR,
   type Story,
 } from './index.js';
 
@@ -27,6 +31,7 @@ function printUsage(): void {
       'Commands:',
       '  init               Initialize a .pf/ workspace in the current directory',
       '  config             Print the resolved product-factory.json config as JSON',
+      '  intake <file>      Ingest a brain-dump (use "-" to read stdin) into a transcript artifact',
       '  version            Print the version',
       '  readiness-demo     Score a sample story against the readiness rubric v0',
       '  help               Show this help',
@@ -64,6 +69,36 @@ function main(argv: readonly string[]): number {
         process.stderr.write(`  ${issue.path}: ${issue.message}\n`);
       }
       return 1;
+    }
+
+    case 'intake': {
+      const target = argv[3];
+      if (target === undefined) {
+        process.stderr.write('usage: product-factory intake <file>  (use "-" for stdin)\n');
+        return 1;
+      }
+      let raw: string;
+      const source = target === '-' ? 'stdin' : target;
+      try {
+        // fd 0 reads stdin synchronously, keeping main() sync like every other command
+        raw = target === '-' ? readFileSync(0, 'utf8') : readFileSync(target, 'utf8');
+      } catch {
+        process.stderr.write(`cannot read ${source}\n`);
+        return 1;
+      }
+      const result = intakeTranscript(process.cwd(), raw, source);
+      if (!result.ok) {
+        process.stderr.write(`${result.error}\n`);
+        return 1;
+      }
+      const logger = createLogger(join(process.cwd(), WORKSPACE_DIR));
+      logger.info('transcript ingested', {
+        id: result.artifact.id,
+        source: result.artifact.source,
+        artifactPath: result.artifactPath,
+      });
+      process.stdout.write(`${result.artifact.id}\n`);
+      return 0;
     }
 
     case 'version':

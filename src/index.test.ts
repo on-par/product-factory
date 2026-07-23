@@ -9,6 +9,8 @@ import {
   CONFIG_FILE,
   createLogger,
   EVENTS_FILE,
+  intakeTranscript,
+  TRANSCRIPTS_DIR,
 } from './index.js';
 
 describe('public API', () => {
@@ -35,5 +37,10 @@ describe('public API', () => {
   it('re-exports createLogger and EVENTS_FILE', () => {
     expect(typeof createLogger).toBe('function');
     expect(EVENTS_FILE).toBe('events.ndjson');
+  });
+
+  it('re-exports intakeTranscript and TRANSCRIPTS_DIR', () => {
+    expect(typeof intakeTranscript).toBe('function');
+    expect(TRANSCRIPTS_DIR).toBe('transcripts');
   });
 });
