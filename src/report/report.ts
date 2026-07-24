@@ -2,12 +2,14 @@
  * Readiness report stage — aggregates a persisted verdict set and its lineage
  * into the markdown report a PM reads at human gate #2. No LLM call: every
  * number here was produced by an earlier stage, so the report is deterministic.
- * Approval lives in ./approve.ts; export targets are a later epic (#8).
+ * Approval lives in ./approve.ts; the markdown export stage lives in
+ * ../export/markdown.ts.
  */
 
 import { createHash } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { z } from 'zod';
 import { WORKSPACE_DIR } from '../workspace/init.js';
 import { loadVerdicts, type StoryVerdict } from '../judge/judge.js';
 import { loadDecomposition } from '../decompose/decompose.js';
@@ -64,6 +66,41 @@ export type BuildReportResult =
       readonly artifactPath: string;
     }
   | { readonly ok: false; readonly error: string };
+
+export type LoadReportResult =
+  | { readonly ok: true; readonly report: ReadinessReport; readonly artifactPath: string }
+  | { readonly ok: false; readonly error: string };
+
+const persistedReportSchema = z.object({
+  id: z.string().regex(/^[0-9a-f]{12}$/),
+  verdictId: z.string().min(1),
+  criteriaId: z.string().min(1),
+  decompositionId: z.string().min(1),
+  intentId: z.string().min(1),
+  createdAt: z.string().min(1),
+  epicTitle: z.string().min(1),
+  epicSummary: z.string().min(1),
+  stories: z.array(
+    z.object({
+      storyIndex: z.number().int().min(0),
+      storyTitle: z.string().min(1),
+      tracesTo: z.array(z.string().min(1)).min(1),
+      readinessScore: z.number(),
+      intentAlignmentScore: z.number(),
+      overallScore: z.number(),
+      readinessReasons: z.array(z.string()),
+      intentAlignmentReasons: z.array(z.string()),
+    }),
+  ),
+  openQuestions: z.array(
+    z.object({
+      index: z.number().int().min(0),
+      question: z.string().min(1),
+      gapType: z.string().min(1),
+      blocking: z.boolean(),
+    }),
+  ),
+});
 
 /** Unanswered questions from a session, sorted by original index — pure. */
 export function collectOpenQuestions(session: AnswerSession): readonly ReportOpenQuestion[] {
@@ -234,6 +271,41 @@ export function buildReadinessReport(targetDir: string, verdictId: string): Buil
   mkdirSync(reportsDir, { recursive: true });
   const artifactPath = join(reportsDir, `${id}.md`);
   writeFileSync(artifactPath, markdown, 'utf8');
+  writeFileSync(join(reportsDir, `${id}.json`), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 
   return { ok: true, report, markdown, artifactPath };
+}
+
+/** Load a previously persisted readiness report from `<targetDir>/.pf/reports/<reportId>.json`. */
+export function loadReport(targetDir: string, reportId: string): LoadReportResult {
+  if (!/^[0-9a-f]{12}$/.test(reportId)) {
+    return { ok: false, error: `readiness report ${reportId} not found` };
+  }
+
+  const artifactPath = join(targetDir, WORKSPACE_DIR, REPORTS_DIR, `${reportId}.json`);
+  let raw: string;
+  try {
+    raw = readFileSync(artifactPath, 'utf8');
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') {
+      return { ok: false, error: `readiness report ${reportId} not found` };
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: `unable to read readiness report ${reportId}: ${message}` };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ok: false, error: `readiness report ${reportId} is not a valid readiness report` };
+  }
+
+  const result = persistedReportSchema.safeParse(parsed);
+  if (!result.success) {
+    return { ok: false, error: `readiness report ${reportId} is not a valid readiness report` };
+  }
+
+  return { ok: true, report: result.data as ReadinessReport, artifactPath };
 }

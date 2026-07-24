@@ -32,7 +32,7 @@ import {
   reworkStories,
   buildReadinessReport,
   approveReport,
-  loadReportApproval,
+  exportMarkdown,
   WORKSPACE_DIR,
   type Story,
   type ConfigIssue,
@@ -67,7 +67,7 @@ function printUsage(): void {
       '  rework <criteriaId>          Rework low-scoring stories until they clear the threshold or the budget is spent',
       '  report <verdictId>           Render the markdown readiness report for a judged story set',
       '  report approve <reportId>    Approve the readiness report (human gate #2)',
-      '  export <reportId>            Export an approved report (refuses unapproved; targets land with epic #8)',
+      '  export markdown <reportId> <dir>   Export an approved report as one markdown file per work item',
       '  version            Print the version',
       '  readiness-demo     Score a sample story against the readiness rubric v0',
       '  help               Show this help',
@@ -578,29 +578,34 @@ async function main(argv: readonly string[]): Promise<number> {
     }
 
     case 'export': {
-      const reportId = argv[3];
-      if (reportId === undefined) {
-        process.stderr.write('usage: product-factory export <reportId>\n');
+      const target = argv[3];
+      const reportId = argv[4];
+      const dir = argv[5];
+      if (target !== 'markdown' || reportId === undefined || dir === undefined) {
+        process.stderr.write('usage: product-factory export markdown <reportId> <dir>\n');
+        if (target !== undefined && target !== 'markdown') {
+          process.stderr.write(
+            'export targets other than markdown land with epic #8 (GitHub/Jira are separate stories)\n',
+          );
+        }
         return 1;
       }
-      const approval = loadReportApproval(process.cwd(), reportId);
-      if (!approval.ok) {
-        process.stderr.write(
-          `export refused: readiness report not approved — run "pf report approve ${reportId}" first (human gate #2)\n`,
-        );
+      const result = exportMarkdown(process.cwd(), reportId, dir);
+      if (!result.ok) {
+        process.stderr.write(`${result.error}\n`);
         const logger = createLogger(join(process.cwd(), WORKSPACE_DIR));
-        logger.warn('export refused: readiness report not approved', { reportId });
+        logger.warn('export refused', { reportId, error: result.error });
         return 1;
       }
       const logger = createLogger(join(process.cwd(), WORKSPACE_DIR));
-      logger.info('export gate passed', {
+      logger.info('markdown export written', {
         reportId,
-        approvedBy: approval.approval.approvedBy,
-        approvedAt: approval.approval.approvedAt,
+        outDir: result.outDir,
+        files: result.files.length,
       });
-      process.stdout.write(
-        `readiness report ${reportId} is approved by ${approval.approval.approvedBy}; export targets are not yet implemented (epic #8)\n`,
-      );
+      for (const file of result.files) {
+        process.stdout.write(`${file.path}\n`);
+      }
       return 0;
     }
 

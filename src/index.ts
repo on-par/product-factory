@@ -146,6 +146,7 @@ export type {
 
 export {
   buildReadinessReport,
+  loadReport,
   renderReadinessReport,
   collectOpenQuestions,
   REPORTS_DIR,
@@ -155,6 +156,7 @@ export type {
   ReportOpenQuestion,
   ReadinessReport,
   BuildReportResult,
+  LoadReportResult,
 } from './report/report.js';
 
 export {
@@ -168,5 +170,8 @@ export type {
   ApproveReportResult,
   LoadReportApprovalResult,
 } from './report/approve.js';
+
+export { exportMarkdown, renderEpicFile, renderStoryFile, slugify } from './export/markdown.js';
+export type { ExportedFile, ExportMarkdownResult } from './export/markdown.js';
 
 export const VERSION = '0.1.0';
