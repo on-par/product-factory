@@ -174,4 +174,20 @@ export type {
 export { exportMarkdown, renderEpicFile, renderStoryFile, slugify } from './export/markdown.js';
 export type { ExportedFile, ExportMarkdownResult } from './export/markdown.js';
 
+export {
+  exportGitHub,
+  renderIssueBody,
+  storyMarker,
+  createGitHubIssueClient,
+} from './export/github.js';
+export type {
+  GitHubIssueClient,
+  GitHubClientOptions,
+  ExistingIssue,
+  CreatedIssue,
+  ExportedIssue,
+  SkippedStory,
+  ExportGitHubResult,
+} from './export/github.js';
+
 export const VERSION = '0.1.0';

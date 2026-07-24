@@ -74,9 +74,10 @@ export function renderEpicFile(
 /**
  * Backtick fence at least one char longer than the longest run of backticks
  * in `content`, so LLM-authored Gherkin text containing its own ``` sequence
- * can never prematurely close the fence.
+ * can never prematurely close the fence. Exported because the GitHub exporter
+ * reuses it for the same reason.
  */
-function fenceFor(content: string): string {
+export function fenceFor(content: string): string {
   const runs = content.match(/`+/g);
   const longestRun = runs === null ? 0 : Math.max(...runs.map((run) => run.length));
   return '`'.repeat(Math.max(3, longestRun + 1));
