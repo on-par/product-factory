@@ -33,6 +33,8 @@ import {
   buildReadinessReport,
   approveReport,
   exportMarkdown,
+  exportGitHub,
+  createGitHubIssueClient,
   WORKSPACE_DIR,
   type Story,
   type ConfigIssue,
@@ -68,6 +70,7 @@ function printUsage(): void {
       '  report <verdictId>           Render the markdown readiness report for a judged story set',
       '  report approve <reportId>    Approve the readiness report (human gate #2)',
       '  export markdown <reportId> <dir>   Export an approved report as one markdown file per work item',
+      '  export github <reportId> <owner/repo>   Create one GitHub issue per story from an approved report (idempotent)',
       '  version            Print the version',
       '  readiness-demo     Score a sample story against the readiness rubric v0',
       '  help               Show this help',
@@ -579,13 +582,54 @@ async function main(argv: readonly string[]): Promise<number> {
 
     case 'export': {
       const target = argv[3];
+
+      if (target === 'github') {
+        const reportId = argv[4];
+        const ownerRepo = argv[5];
+        if (reportId === undefined || ownerRepo === undefined) {
+          process.stderr.write('usage: product-factory export github <reportId> <owner/repo>\n');
+          return 1;
+        }
+        const token = process.env.GITHUB_TOKEN;
+        if (token === undefined || token === '') {
+          process.stderr.write('GITHUB_TOKEN is not set\n');
+          return 1;
+        }
+        const client = createGitHubIssueClient({ token });
+        const result = await exportGitHub(process.cwd(), reportId, ownerRepo, client);
+        if (!result.ok) {
+          process.stderr.write(`${result.error}\n`);
+          const logger = createLogger(join(process.cwd(), WORKSPACE_DIR));
+          logger.warn('github export refused', { reportId, repo: ownerRepo, error: result.error });
+          return 1;
+        }
+        const logger = createLogger(join(process.cwd(), WORKSPACE_DIR));
+        logger.info('github export finished', {
+          reportId,
+          repo: ownerRepo,
+          created: result.created.length,
+          skipped: result.skipped.length,
+        });
+        for (const issue of result.created) {
+          process.stdout.write(`created #${issue.issueNumber} ${issue.storyTitle} ${issue.url}\n`);
+        }
+        for (const story of result.skipped) {
+          process.stdout.write(
+            `skipped #${story.issueNumber} ${story.storyTitle} (already exported)\n`,
+          );
+        }
+        return 0;
+      }
+
       const reportId = argv[4];
       const dir = argv[5];
       if (target !== 'markdown' || reportId === undefined || dir === undefined) {
-        process.stderr.write('usage: product-factory export markdown <reportId> <dir>\n');
-        if (target !== undefined && target !== 'markdown') {
+        process.stderr.write(
+          'usage: product-factory export markdown <reportId> <dir> | export github <reportId> <owner/repo>\n',
+        );
+        if (target !== undefined && target !== 'markdown' && target !== 'github') {
           process.stderr.write(
-            'export targets other than markdown land with epic #8 (GitHub/Jira are separate stories)\n',
+            'export targets other than markdown/github land with epic #8 (Jira is a separate story)\n',
           );
         }
         return 1;
