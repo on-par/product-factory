@@ -31,6 +31,8 @@ import {
   judgeStories,
   reworkStories,
   buildReadinessReport,
+  approveReport,
+  loadReportApproval,
   WORKSPACE_DIR,
   type Story,
   type ConfigIssue,
@@ -64,6 +66,8 @@ function printUsage(): void {
       '  judge <criteriaId>           Judge every story: readiness rubric + intent-alignment scores with reasons',
       '  rework <criteriaId>          Rework low-scoring stories until they clear the threshold or the budget is spent',
       '  report <verdictId>           Render the markdown readiness report for a judged story set',
+      '  report approve <reportId>    Approve the readiness report (human gate #2)',
+      '  export <reportId>            Export an approved report (refuses unapproved; targets land with epic #8)',
       '  version            Print the version',
       '  readiness-demo     Score a sample story against the readiness rubric v0',
       '  help               Show this help',
@@ -521,9 +525,38 @@ async function main(argv: readonly string[]): Promise<number> {
     }
 
     case 'report': {
+      const usage = 'usage: product-factory report <verdictId> | report approve <reportId>\n';
+
+      if (argv[3] === 'approve') {
+        if (argv[4] === undefined) {
+          process.stderr.write(usage);
+          return 1;
+        }
+        const approver = process.env.PF_APPROVER ?? userInfo().username;
+        const result = approveReport(process.cwd(), argv[4], approver);
+        if (!result.ok) {
+          process.stderr.write(`${result.error}\n`);
+          return 1;
+        }
+        const logger = createLogger(join(process.cwd(), WORKSPACE_DIR));
+        logger.info('readiness report approved', {
+          reportId: argv[4],
+          approvedBy: result.approval.approvedBy,
+          approvedAt: result.approval.approvedAt,
+          alreadyApproved: result.alreadyApproved,
+          approvalPath: result.approvalPath,
+        });
+        process.stdout.write(
+          result.alreadyApproved
+            ? `readiness report ${argv[4]} already approved by ${result.approval.approvedBy} at ${result.approval.approvedAt}\n`
+            : `readiness report ${argv[4]} approved by ${result.approval.approvedBy} at ${result.approval.approvedAt}\n`,
+        );
+        return 0;
+      }
+
       const verdictId = argv[3];
       if (verdictId === undefined) {
-        process.stderr.write('usage: product-factory report <verdictId>\n');
+        process.stderr.write(usage);
         return 1;
       }
       // No config or API key: the report is pure aggregation over persisted artifacts.
@@ -541,6 +574,33 @@ async function main(argv: readonly string[]): Promise<number> {
         artifactPath: result.artifactPath,
       });
       process.stdout.write(result.markdown);
+      return 0;
+    }
+
+    case 'export': {
+      const reportId = argv[3];
+      if (reportId === undefined) {
+        process.stderr.write('usage: product-factory export <reportId>\n');
+        return 1;
+      }
+      const approval = loadReportApproval(process.cwd(), reportId);
+      if (!approval.ok) {
+        process.stderr.write(
+          `export refused: readiness report not approved — run "pf report approve ${reportId}" first (human gate #2)\n`,
+        );
+        const logger = createLogger(join(process.cwd(), WORKSPACE_DIR));
+        logger.warn('export refused: readiness report not approved', { reportId });
+        return 1;
+      }
+      const logger = createLogger(join(process.cwd(), WORKSPACE_DIR));
+      logger.info('export gate passed', {
+        reportId,
+        approvedBy: approval.approval.approvedBy,
+        approvedAt: approval.approval.approvedAt,
+      });
+      process.stdout.write(
+        `readiness report ${reportId} is approved by ${approval.approval.approvedBy}; export targets are not yet implemented (epic #8)\n`,
+      );
       return 0;
     }
 
