@@ -190,4 +190,27 @@ export type {
   ExportGitHubResult,
 } from './export/github.js';
 
+export {
+  exportJira,
+  renderEpicDescription,
+  renderStoryDescription,
+  extractAdfText,
+  jiraEpicMarker,
+  jiraStoryMarker,
+  createJiraIssueClient,
+} from './export/jira.js';
+export type {
+  JiraIssueClient,
+  JiraClientOptions,
+  JiraDoc,
+  JiraDocNode,
+  ExistingJiraIssue,
+  CreateJiraIssueInput,
+  CreatedJiraIssue,
+  JiraEpicResult,
+  CreatedJiraStory,
+  SkippedJiraStory,
+  ExportJiraResult,
+} from './export/jira.js';
+
 export const VERSION = '0.1.0';

@@ -35,6 +35,8 @@ import {
   exportMarkdown,
   exportGitHub,
   createGitHubIssueClient,
+  exportJira,
+  createJiraIssueClient,
   WORKSPACE_DIR,
   type Story,
   type ConfigIssue,
@@ -71,6 +73,7 @@ function printUsage(): void {
       '  report approve <reportId>    Approve the readiness report (human gate #2)',
       '  export markdown <reportId> <dir>   Export an approved report as one markdown file per work item',
       '  export github <reportId> <owner/repo>   Create one GitHub issue per story from an approved report (idempotent)',
+      '  export jira <reportId> <projectKey>   Create a Jira epic and one linked story per story from an approved report (idempotent)',
       '  version            Print the version',
       '  readiness-demo     Score a sample story against the readiness rubric v0',
       '  help               Show this help',
@@ -621,16 +624,72 @@ async function main(argv: readonly string[]): Promise<number> {
         return 0;
       }
 
+      if (target === 'jira') {
+        const reportId = argv[4];
+        const projectKey = argv[5];
+        if (reportId === undefined || projectKey === undefined) {
+          process.stderr.write('usage: product-factory export jira <reportId> <projectKey>\n');
+          return 1;
+        }
+        const baseUrl = process.env.JIRA_BASE_URL;
+        const email = process.env.JIRA_EMAIL;
+        const apiToken = process.env.JIRA_API_TOKEN;
+        if (baseUrl === undefined || baseUrl === '') {
+          process.stderr.write('JIRA_BASE_URL is not set\n');
+          return 1;
+        }
+        if (email === undefined || email === '') {
+          process.stderr.write('JIRA_EMAIL is not set\n');
+          return 1;
+        }
+        if (apiToken === undefined || apiToken === '') {
+          process.stderr.write('JIRA_API_TOKEN is not set\n');
+          return 1;
+        }
+        const client = createJiraIssueClient({ baseUrl, email, apiToken });
+        const result = await exportJira(process.cwd(), reportId, projectKey, client);
+        if (!result.ok) {
+          process.stderr.write(`${result.error}\n`);
+          const logger = createLogger(join(process.cwd(), WORKSPACE_DIR));
+          logger.warn('jira export refused', { reportId, projectKey, error: result.error });
+          return 1;
+        }
+        const logger = createLogger(join(process.cwd(), WORKSPACE_DIR));
+        logger.info('jira export finished', {
+          reportId,
+          projectKey,
+          epicKey: result.epic.issueKey,
+          epicCreated: result.epic.created,
+          created: result.created.length,
+          skipped: result.skipped.length,
+        });
+        process.stdout.write(
+          `epic ${result.epic.created ? 'created' : 'reused'} ${result.epic.issueKey} ${result.epic.url}\n`,
+        );
+        for (const story of result.created) {
+          process.stdout.write(`created ${story.issueKey} ${story.storyTitle} ${story.url}\n`);
+        }
+        for (const story of result.skipped) {
+          process.stdout.write(
+            `skipped ${story.issueKey} ${story.storyTitle} (already exported)\n`,
+          );
+        }
+        return 0;
+      }
+
       const reportId = argv[4];
       const dir = argv[5];
       if (target !== 'markdown' || reportId === undefined || dir === undefined) {
         process.stderr.write(
-          'usage: product-factory export markdown <reportId> <dir> | export github <reportId> <owner/repo>\n',
+          'usage: product-factory export markdown <reportId> <dir> | export github <reportId> <owner/repo> | export jira <reportId> <projectKey>\n',
         );
-        if (target !== undefined && target !== 'markdown' && target !== 'github') {
-          process.stderr.write(
-            'export targets other than markdown/github land with epic #8 (Jira is a separate story)\n',
-          );
+        if (
+          target !== undefined &&
+          target !== 'markdown' &&
+          target !== 'github' &&
+          target !== 'jira'
+        ) {
+          process.stderr.write(`unknown export target: ${target}\n`);
         }
         return 1;
       }

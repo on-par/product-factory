@@ -2,7 +2,7 @@
  * GitHub export stage — creates one GitHub issue per story from an approved
  * readiness report. Refuses unapproved reports (human gate #2). Idempotent:
  * stories whose traceability marker already appears in an existing issue
- * body are skipped. Jira is a separate story.
+ * body are skipped. Jira is a separate export target (see export/jira.ts).
  */
 
 import { z } from 'zod';

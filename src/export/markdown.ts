@@ -1,8 +1,8 @@
 /**
  * Markdown export stage — writes one markdown file per work item (epic +
  * stories) from an approved readiness report. Refuses unapproved reports
- * before touching the filesystem (human gate #2). GitHub/Jira targets are
- * separate stories.
+ * before touching the filesystem (human gate #2). GitHub and Jira are
+ * separate export targets (see export/github.ts, export/jira.ts).
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
