@@ -2,7 +2,7 @@
  * Readiness report stage — aggregates a persisted verdict set and its lineage
  * into the markdown report a PM reads at human gate #2. No LLM call: every
  * number here was produced by an earlier stage, so the report is deterministic.
- * Approval and export are later stories.
+ * Approval lives in ./approve.ts; export targets are a later epic (#8).
  */
 
 import { createHash } from 'node:crypto';

@@ -157,4 +157,16 @@ export type {
   BuildReportResult,
 } from './report/report.js';
 
+export {
+  approveReport,
+  loadReportApproval,
+  isReportApproved,
+  REPORT_APPROVAL_SUFFIX,
+} from './report/approve.js';
+export type {
+  ReportApproval,
+  ApproveReportResult,
+  LoadReportApprovalResult,
+} from './report/approve.js';
+
 export const VERSION = '0.1.0';
