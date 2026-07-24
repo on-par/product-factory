@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   buildReadinessReport,
+  loadReport,
   renderReadinessReport,
   collectOpenQuestions,
   REPORTS_DIR,
@@ -306,6 +307,53 @@ describe('buildReadinessReport', () => {
 
     expect(first.report.id).toMatch(/^[0-9a-f]{12}$/);
     expect(second.report.id).toBe(first.report.id);
+  });
+
+  it('also persists a JSON sidecar that loadReport round-trips', async () => {
+    const { criteria } = await seedCriteria(dir);
+    const judged = await judgeStories(dir, criteria.id, judgeFakeCaller(REPORT_JUDGE_PAYLOAD));
+    if (!judged.ok) throw new Error('expected ok');
+
+    const built = buildReadinessReport(dir, judged.verdicts.id);
+    expect(built.ok).toBe(true);
+    if (!built.ok) throw new Error('expected ok');
+
+    const sidecarPath = join(dir, WORKSPACE_DIR, REPORTS_DIR, `${built.report.id}.json`);
+    expect(existsSync(sidecarPath)).toBe(true);
+
+    const loaded = loadReport(dir, built.report.id);
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) throw new Error('expected ok');
+    expect(loaded.report).toEqual(built.report);
+    expect(loaded.artifactPath).toBe(sidecarPath);
+  });
+});
+
+describe('loadReport error paths', () => {
+  it('invalid id returns not found', () => {
+    const result = loadReport(dir, 'nope');
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected not ok');
+    expect(result.error).toBe('readiness report nope not found');
+  });
+
+  it('well-formed but absent id returns not found', () => {
+    const result = loadReport(dir, 'ffffffffffff');
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected not ok');
+    expect(result.error).toBe('readiness report ffffffffffff not found');
+  });
+
+  it('corrupt JSON on disk returns "is not a valid readiness report"', () => {
+    const reportsDir = join(dir, WORKSPACE_DIR, REPORTS_DIR);
+    mkdirSync(reportsDir, { recursive: true });
+    writeFileSync(join(reportsDir, 'abcabcabcabc.json'), JSON.stringify({ nope: true }), 'utf8');
+
+    const result = loadReport(dir, 'abcabcabcabc');
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected not ok');
+    expect(result.error).toBe('readiness report abcabcabcabc is not a valid readiness report');
   });
 });
 

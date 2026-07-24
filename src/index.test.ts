@@ -31,6 +31,8 @@ import {
   renderReadinessReport,
   collectOpenQuestions,
   REPORTS_DIR,
+  exportMarkdown,
+  slugify,
 } from './index.js';
 
 describe('public API', () => {
@@ -102,5 +104,10 @@ describe('public API', () => {
     expect(typeof renderReadinessReport).toBe('function');
     expect(typeof collectOpenQuestions).toBe('function');
     expect(REPORTS_DIR).toBe('reports');
+  });
+
+  it('re-exports the markdown export stage', () => {
+    expect(typeof exportMarkdown).toBe('function');
+    expect(slugify('Export CSV')).toBe('export-csv');
   });
 });
