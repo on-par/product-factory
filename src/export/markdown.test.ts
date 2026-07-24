@@ -87,6 +87,36 @@ describe('renderStoryFile', () => {
     expect(markdown).toContain('Then a CSV file is produced');
     expect(markdown).toContain('Traces to: INT-001, INT-003');
   });
+
+  it('widens the code fence when scenario text contains a triple backtick, so the fence cannot be prematurely closed', () => {
+    const story = {
+      title: 'Export CSV',
+      asA: 'PM',
+      iWant: 'to export stories as CSV',
+      soThat: 'I can share them',
+      tracesTo: ['INT-001'],
+    };
+    const criteria = {
+      storyIndex: 0,
+      storyTitle: 'Export CSV',
+      tracesTo: ['INT-001'],
+      scenarios: [
+        {
+          name: 'Quotes a code block',
+          given: ['a step that quotes ```json { "a": 1 } ``` inline'],
+          when: ['they export it'],
+          then: ['the fence still wraps the whole scenario'],
+        },
+      ],
+      readinessFlags: [],
+    };
+
+    const markdown = renderStoryFile(BASE_REPORT, story, criteria);
+
+    expect(markdown).toContain('````gherkin');
+    expect(markdown).toContain('Traces to: INT-001');
+    expect(markdown).not.toMatch(/^```gherkin$/m);
+  });
 });
 
 describe('renderEpicFile', () => {

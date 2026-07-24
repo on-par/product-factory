@@ -71,6 +71,17 @@ export function renderEpicFile(
   return `${lines.join('\n')}\n`;
 }
 
+/**
+ * Backtick fence at least one char longer than the longest run of backticks
+ * in `content`, so LLM-authored Gherkin text containing its own ``` sequence
+ * can never prematurely close the fence.
+ */
+function fenceFor(content: string): string {
+  const runs = content.match(/`+/g);
+  const longestRun = runs === null ? 0 : Math.max(...runs.map((run) => run.length));
+  return '`'.repeat(Math.max(3, longestRun + 1));
+}
+
 /** Render one story's markdown file — pure. */
 export function renderStoryFile(
   report: ReadinessReport,
@@ -92,7 +103,9 @@ export function renderStoryFile(
     if (index > 0) {
       lines.push('');
     }
-    lines.push('```gherkin', renderScenario(scenario), '```');
+    const rendered = renderScenario(scenario);
+    const fence = fenceFor(rendered);
+    lines.push(`${fence}gherkin`, rendered, fence);
   });
 
   lines.push(
