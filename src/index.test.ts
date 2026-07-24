@@ -25,6 +25,12 @@ import {
   combinedScore,
   bestRound,
   REWORKS_DIR,
+  loadVerdicts,
+  loadAnswerSession,
+  buildReadinessReport,
+  renderReadinessReport,
+  collectOpenQuestions,
+  REPORTS_DIR,
 } from './index.js';
 
 describe('public API', () => {
@@ -87,5 +93,14 @@ describe('public API', () => {
     expect(typeof combinedScore).toBe('function');
     expect(typeof bestRound).toBe('function');
     expect(REWORKS_DIR).toBe('reworks');
+  });
+
+  it('re-exports the readiness report surface, its lineage loaders, and REPORTS_DIR', () => {
+    expect(typeof loadVerdicts).toBe('function');
+    expect(typeof loadAnswerSession).toBe('function');
+    expect(typeof buildReadinessReport).toBe('function');
+    expect(typeof renderReadinessReport).toBe('function');
+    expect(typeof collectOpenQuestions).toBe('function');
+    expect(REPORTS_DIR).toBe('reports');
   });
 });

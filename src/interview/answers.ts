@@ -53,6 +53,10 @@ export type RecordAnswersResult =
   | { readonly ok: true; readonly session: AnswerSession; readonly sessionPath: string }
   | { readonly ok: false; readonly error: string };
 
+export type LoadAnswerSessionResult =
+  | { readonly ok: true; readonly session: AnswerSession; readonly sessionPath: string }
+  | { readonly ok: false; readonly error: string };
+
 const questionsArtifactShapeSchema = z
   .object({
     id: z.string(),
@@ -264,4 +268,38 @@ export function recordAnswerRound(
   writeFileSync(sessionPath, `${JSON.stringify(updatedSession, null, 2)}\n`, 'utf8');
 
   return { ok: true, session: updatedSession, sessionPath };
+}
+
+/** Load a persisted answer session from `<targetDir>/.pf/answers/<interviewId>.json`. */
+export function loadAnswerSession(targetDir: string, interviewId: string): LoadAnswerSessionResult {
+  if (!/^[0-9a-f]{12}$/.test(interviewId)) {
+    return { ok: false, error: `interview ${interviewId} not found` };
+  }
+
+  const sessionPath = join(targetDir, WORKSPACE_DIR, ANSWERS_DIR, `${interviewId}.json`);
+  let raw: string;
+  try {
+    raw = readFileSync(sessionPath, 'utf8');
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') {
+      return { ok: false, error: `interview ${interviewId} not found` };
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: `unable to read interview ${interviewId}: ${message}` };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ok: false, error: `interview ${interviewId} is not a valid interview artifact` };
+  }
+
+  const result = sessionSchema.safeParse(parsed);
+  if (!result.success) {
+    return { ok: false, error: `interview ${interviewId} is not a valid interview artifact` };
+  }
+
+  return { ok: true, session: result.data as AnswerSession, sessionPath };
 }

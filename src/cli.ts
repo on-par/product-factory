@@ -30,6 +30,7 @@ import {
   renderScenario,
   judgeStories,
   reworkStories,
+  buildReadinessReport,
   WORKSPACE_DIR,
   type Story,
   type ConfigIssue,
@@ -62,6 +63,7 @@ function printUsage(): void {
       '  criteria <decompositionId>   Generate Gherkin acceptance criteria for every story in a decomposition',
       '  judge <criteriaId>           Judge every story: readiness rubric + intent-alignment scores with reasons',
       '  rework <criteriaId>          Rework low-scoring stories until they clear the threshold or the budget is spent',
+      '  report <verdictId>           Render the markdown readiness report for a judged story set',
       '  version            Print the version',
       '  readiness-demo     Score a sample story against the readiness rubric v0',
       '  help               Show this help',
@@ -515,6 +517,30 @@ async function main(argv: readonly string[]): Promise<number> {
         `best: round ${result.session.bestIteration} (criteria ${result.session.bestCriteriaId}, score ${result.session.rounds[result.session.bestIteration].score.toFixed(2)})\n`,
       );
       process.stdout.write(`${result.session.id}\n`);
+      return 0;
+    }
+
+    case 'report': {
+      const verdictId = argv[3];
+      if (verdictId === undefined) {
+        process.stderr.write('usage: product-factory report <verdictId>\n');
+        return 1;
+      }
+      // No config or API key: the report is pure aggregation over persisted artifacts.
+      const result = buildReadinessReport(process.cwd(), verdictId);
+      if (!result.ok) {
+        process.stderr.write(`${result.error}\n`);
+        return 1;
+      }
+      const logger = createLogger(join(process.cwd(), WORKSPACE_DIR));
+      logger.info('readiness report rendered', {
+        verdictId,
+        reportId: result.report.id,
+        stories: result.report.stories.length,
+        openQuestions: result.report.openQuestions.length,
+        artifactPath: result.artifactPath,
+      });
+      process.stdout.write(result.markdown);
       return 0;
     }
 

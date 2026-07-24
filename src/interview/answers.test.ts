@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   recordAnswerRound,
+  loadAnswerSession,
   evaluateStoppingRule,
   isBlockingQuestion,
   openBlockingQuestions,
@@ -302,5 +303,46 @@ describe('recordAnswerRound', () => {
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('expected not ok');
     expect(result.error).toContain('corrupt');
+  });
+});
+
+describe('loadAnswerSession', () => {
+  it('round-trips a session written by recordAnswerRound', async () => {
+    const questionsId = await seedQuestions(dir, MIXED);
+    const written = recordAnswerRound(dir, questionsId, { '0': 'a', '1': 'b' });
+    if (!written.ok) throw new Error('expected ok');
+
+    const result = loadAnswerSession(dir, questionsId);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.session).toEqual(written.session);
+    expect(result.sessionPath).toBe(written.sessionPath);
+  });
+
+  it('malformed interview id returns not found', () => {
+    const result = loadAnswerSession(dir, 'nope');
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected not ok');
+    expect(result.error).toBe('interview nope not found');
+  });
+
+  it('absent interview session returns not found', () => {
+    const result = loadAnswerSession(dir, 'ffffffffffff');
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected not ok');
+    expect(result.error).toBe('interview ffffffffffff not found');
+  });
+
+  it('corrupt interview JSON returns "is not a valid interview artifact"', () => {
+    const answersDir = join(dir, WORKSPACE_DIR, ANSWERS_DIR);
+    mkdirSync(answersDir, { recursive: true });
+    writeFileSync(join(answersDir, 'abcabcabcabc.json'), 'not valid json{', 'utf8');
+
+    const result = loadAnswerSession(dir, 'abcabcabcabc');
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected not ok');
+    expect(result.error).toBe('interview abcabcabcabc is not a valid interview artifact');
   });
 });
